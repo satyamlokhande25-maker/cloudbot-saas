@@ -1,25 +1,23 @@
-import json
 import requests
 from app.core.config import settings
 from app.db.vector_store import get_vector_store
 
 def _call_gemini_api(system_instruction: str, user_content: str) -> str:
-    api_key = getattr(settings, "GOOGLE_API_KEY", "").strip()
+    api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
     if not api_key:
-        return "Backend Error: GOOGLE_API_KEY is missing or not configured on the server."
+        return "Backend Error: GOOGLE_API_KEY is not configured on the backend server."
 
-    # Priority models list
+    # केवल नए और 100% सपोर्टेड मॉडल्स की लिस्ट
     models_to_try = [
-        "models/gemini-1.5-flash",
-        "models/gemini-2.0-flash",
-        "models/gemini-1.5-flash-latest",
-        "models/gemini-1.5-pro",
-        "models/gemini-pro"
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro"
     ]
 
     headers = {"Content-Type": "application/json"}
     
-    # 1. Payload with clean system instruction
+    # 1. Payload with system instruction
     payload_system = {
         "system_instruction": {
             "parts": [{"text": system_instruction}]
@@ -35,9 +33,9 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
 
     last_error = ""
 
-    for model_path in models_to_try:
-        clean_path = model_path if model_path.startswith("models/") else f"models/{model_path}"
-        url = f"https://generativelanguage.googleapis.com/v1beta/{clean_path}:generateContent?key={api_key}"
+    for model_name in models_to_try:
+        # models/ prefix जोड़ना सुनिश्चित करें
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         
         try:
             resp = requests.post(url, headers=headers, json=payload_system, timeout=25)
@@ -53,7 +51,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
                         if answer_text:
                             return answer_text
             else:
-                # 2. Fallback payload for models that don't support system_instruction field
+                # 2. Fallback payload (बिना system_instruction फ़ील्ड के डायरेक्ट प्रॉम्प्ट)
                 alt_payload = {
                     "contents": [{
                         "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]
@@ -72,7 +70,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
                                 answer_text = answer_text.split("Constraint Checklist")[0].strip()
                             if answer_text:
                                 return answer_text
-                last_error = f"{model_path}: {resp.text}"
+                last_error = f"{model_name}: {resp.text}"
         except Exception as e:
             last_error = str(e)
             continue
@@ -80,7 +78,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
 def generate_rag_response(bot_id: str, question: str) -> str:
-    """Retrieves context from vector store and returns a clear, grounded answer."""
+    """Retrieves context from vector store and generates an answer."""
     try:
         vector_store = get_vector_store(bot_id)
         retriever = vector_store.as_retriever(search_kwargs={"k": 6})
@@ -89,19 +87,18 @@ def generate_rag_response(bot_id: str, question: str) -> str:
         context = "\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
         system_instruction = (
-            "You are CloudBot, an intelligent and helpful AI customer assistant. "
-            "Answer the user's question clearly, directly, and comprehensively based ONLY on the provided context. "
-            "Do NOT include meta-talk, reasoning steps, internal rules, or checklists. "
-            "Format your answer with clean bullet points and clear paragraphs. "
-            "If the context does not contain the answer, reply with: 'I do not have enough information from the provided content.'"
+            "You are CloudBot, a helpful AI customer assistant. "
+            "Answer the user's question clearly, directly, and accurately using information from the context. "
+            "Do NOT include meta-talk, reasoning steps, or internal rules. Format points cleanly with bullet points (-). "
+            "If the answer cannot be found in the context, reply with: 'I do not have enough information from the provided content.'"
         )
 
-        user_content = f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer directly:"
+        user_content = f"Context:\n{context}\n\nUser Question:\n{question}\n\nAnswer directly:"
 
         response = _call_gemini_api(system_instruction, user_content)
         if response and response.strip():
             return response.strip()
-            
+
         return "I do not have enough information from the provided content."
 
     except Exception as e:
