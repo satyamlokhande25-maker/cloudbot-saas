@@ -13,33 +13,15 @@ router = APIRouter(prefix="/bots", tags=["Bot Management"])
 @router.post("/", response_model=BotResponse)
 def create_bot(
     request: BotCreateRequest, 
-    user_identity: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 1. Look for user by email or ID
-    user = db.query(User).filter((User.email == user_identity) | (User.id == user_identity)).first()
-    
-    # 2. Safe Fallback
-    if not user:
-        user = db.query(User).first()
-        if not user:
-            user = User(
-                id=f"usr_{uuid.uuid4().hex[:8]}", 
-                email=user_identity,
-                password_hash="system_generated_hash"
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-
-    # 3. Create Bot instance
     new_bot = Bot(
         id=f"bot_{uuid.uuid4().hex[:8]}",
-        user_id=user.id,
+        user_id=current_user.id,
         name=request.name,
         system_prompt=request.system_prompt or "You are a helpful AI customer support assistant.",
-        temperature=request.temperature if request.temperature is not None else 0.2,
-        theme_color=request.theme_color or "#4f46e5"
+        temperature=request.temperature if request.temperature is not None else 0.2
     )
     db.add(new_bot)
     db.commit()
@@ -48,16 +30,10 @@ def create_bot(
 
 @router.get("/", response_model=List[BotResponse])
 def get_user_bots(
-    user_identity: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter((User.email == user_identity) | (User.id == user_identity)).first()
-    if not user:
-        user = db.query(User).first()
-        if not user:
-            return []
-
-    return db.query(Bot).filter(Bot.user_id == user.id).all()
+    return db.query(Bot).filter(Bot.user_id == current_user.id).all()
 
 @router.get("/{bot_id}", response_model=BotResponse)
 def get_bot_details(bot_id: str, db: Session = Depends(get_db)):
