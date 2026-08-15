@@ -8,11 +8,12 @@ requests
 beautifulsoup4
 pypdf
 youtube-transcript-api
+yt-dlp
 chromadb
 langchain-chroma
 langchain-core
 langchain-text-splitters
-python-jose[cryptography]
-passlib[bcrypt]
+PyJWT
+bcrypt
 email-validator
 python-multipart
