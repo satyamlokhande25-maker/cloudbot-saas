@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cloudbot-saas.onrender.com';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +10,7 @@ export const apiClient = axios.create({
   },
 });
 
-// Auto-attach JWT Token to every outgoing request
+
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
@@ -62,12 +63,11 @@ export const getChatHistory = async (botId: string) => {
   return res.data;
 };
 
-// 4. Bot Management APIs (Multi-Bot & Customization)
+// 4. Bot Management APIs
 export const createNewBot = async (data: {
   name: string;
   system_prompt?: string;
   temperature?: number;
-  theme_color?: string;
 }) => {
   const res = await apiClient.post('/bots/', data);
   return res.data;
