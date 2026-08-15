@@ -16,18 +16,23 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# सभी API राउटर्स शामिल करें
 app.include_router(auth_router)
+app.include_router(bots_router)
 app.include_router(train_router)
 app.include_router(chat_router)
-app.include_router(bots_router)
+
+@app.get("/")
+def root():
+    return {"message": "CloudBot API is Live"}
 
 @app.get("/health", tags=["default"])
 def health_check():
