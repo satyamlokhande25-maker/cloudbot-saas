@@ -12,7 +12,7 @@ from app.db.vector_store import add_documents_to_vector_store
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
 def extract_video_id(url: str) -> str:
-    """Extracts 11-character video ID from any YouTube URL format."""
+    """Extracts 11-character video ID from any YouTube URL."""
     clean = str(url).strip()
     patterns = [
         r"(?:v=|\/embed\/|\/v\/|youtu\.be\/|\/shorts\/|^)([a-zA-Z0-9_-]{11})(?:\?|&|$|\/)",
@@ -24,14 +24,14 @@ def extract_video_id(url: str) -> str:
             return match.group(1)
     raise HTTPException(status_code=400, detail=f"Invalid YouTube URL format: {url}")
 
-def _fetch_subtitles_innertube(video_id: str) -> str:
-    """Extracts full transcript via YouTube InnerTube API (Bypasses Datacenter IP restrictions)."""
+def _fetch_subtitles_via_android_client(video_id: str) -> str:
+    """Uses Android client context which bypasses datacenter IP restrictions."""
     url = "https://www.youtube.com/youtubei/v1/player"
     payload = {
         "context": {
             "client": {
-                "clientName": "WEB_EMBEDDED_PLAYER",
-                "clientVersion": "1.20240318.01.00",
+                "clientName": "ANDROID",
+                "clientVersion": "19.09.37",
                 "hl": "en",
                 "gl": "US"
             }
@@ -39,7 +39,7 @@ def _fetch_subtitles_innertube(video_id: str) -> str:
         "videoId": video_id
     }
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 14) gzip",
         "Content-Type": "application/json"
     }
 
@@ -54,77 +54,91 @@ def _fetch_subtitles_innertube(video_id: str) -> str:
         if not tracks:
             return ""
 
-        # Priority language selection
-        selected_track = tracks[0]
+        base_url = tracks[0].get("baseUrl")
         for track in tracks:
             lang = track.get("languageCode", "").lower()
             if lang in ["en", "en-us", "en-gb", "hi"]:
-                selected_track = track
+                base_url = track.get("baseUrl")
                 break
 
-        base_url = selected_track.get("baseUrl")
         if not base_url:
             return ""
 
-        sub_resp = requests.get(base_url, headers=headers, timeout=12)
-        root = ET.fromstring(sub_resp.text)
-        texts = [html.unescape(elem.text) for elem in root.findall(".//text") if elem.text]
-        return " ".join(texts)
+        sub_resp = requests.get(base_url, timeout=12)
+        if sub_resp.status_code == 200 and sub_resp.text:
+            root = ET.fromstring(sub_resp.text)
+            texts = [html.unescape(elem.text) for elem in root.findall(".//text") if elem.text]
+            return " ".join(texts)
     except Exception:
-        return ""
+        pass
+    return ""
 
-def _fetch_via_transcript_api(video_id: str) -> str:
-    """Extracts full transcript using YouTubeTranscriptApi with comprehensive language matching."""
+def _fetch_subtitles_via_transcript_api(video_id: str) -> str:
+    """Fetches transcript using youtube-transcript-api."""
     try:
         try:
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB', 'hi'])
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi'])
         except Exception:
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
         
         return " ".join([item.get("text", "") for item in transcript_list])
     except Exception:
         pass
-    
-    # Try list_transcripts iterator
+    return ""
+
+def _fetch_video_details_fallback(video_id: str, clean_url: str) -> str:
+    """Extracts title, author, and description if subtitles are blocked."""
+    content_parts = []
     try:
-        transcript_obj = YouTubeTranscriptApi.list_transcripts(video_id)
-        try:
-            t = transcript_obj.find_transcript(['en', 'en-US', 'hi'])
-        except Exception:
-            t = transcript_obj.find_generated_transcript(['en', 'hi'])
-        data = t.fetch()
-        return " ".join([item.get("text", "") for item in data])
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(f"https://noembed.com/embed?url={clean_url}", headers=headers, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            title = data.get("title", "")
+            author = data.get("author_name", "")
+            if title:
+                content_parts.append(f"Title: {title}\nAuthor/Channel: {author}")
     except Exception:
-        return ""
+        pass
+
+    try:
+        html_resp = requests.get(f"https://www.youtube.com/watch?v={video_id}", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        desc_match = re.search(r'"shortDescription":"(.*?)"', html_resp.text)
+        if desc_match:
+            desc = desc_match.group(1).encode().decode('unicode-escape')
+            content_parts.append(f"Description:\n{desc}")
+    except Exception:
+        pass
+
+    return "\n\n".join(content_parts)
 
 def process_youtube_video(bot_id: str, url: str) -> int:
-    """Extracts complete transcript, splits into chunks, and stores into ChromaDB."""
+    """Processes video transcripts with multi-client bypass and stores into ChromaDB."""
     video_id = extract_video_id(url)
     clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    full_transcript = ""
+    
+    # 1. Android client innerTube extraction
+    full_text = _fetch_subtitles_via_android_client(video_id)
 
-    # Strategy 1: YouTubeTranscriptApi
-    full_transcript = _fetch_via_transcript_api(video_id)
+    # 2. Transcript API fallback
+    if not full_text or len(full_text.strip()) < 50:
+        full_text = _fetch_subtitles_via_transcript_api(video_id)
 
-    # Strategy 2: Direct InnerTube Scraping (Cloud Datacenter Compatible)
-    if not full_transcript or len(full_transcript.strip()) < 50:
-        full_transcript = _fetch_subtitles_innertube(video_id)
+    # 3. Comprehensive video metadata and description fallback
+    if not full_text or len(full_text.strip()) < 50:
+        full_text = _fetch_video_details_fallback(video_id, clean_url)
 
-    # Validate extracted content
-    if not full_transcript or not full_transcript.strip():
+    if not full_text or not full_text.strip():
         raise HTTPException(
             status_code=400,
-            detail=f"Unable to extract captions for video ({video_id}). Please ensure the video has public English/Hindi subtitles/CC enabled."
+            detail=f"Unable to extract content for video ({video_id}). Please check the link."
         )
 
-    # Create document and split into multi-part chunks
     doc = Document(
-        page_content=full_transcript.strip(),
+        page_content=full_text.strip(),
         metadata={"source": clean_url, "video_id": video_id}
     )
     chunks = text_splitter.split_documents([doc])
-    
-    # Store all chunks into Vector DB
     add_documents_to_vector_store(chunks, bot_id)
 
     return len(chunks)
