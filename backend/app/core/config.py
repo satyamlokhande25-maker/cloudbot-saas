@@ -10,8 +10,10 @@ class Settings:
     CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma_db")
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploaded_files")
     
-    # 🔹 JWT Configuration
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-super-secret-jwt-key-change-in-prod-123456")
+    # 🔹 JWT Configuration (दोनों कीज़ को सपोर्ट करने वाला सेफ़ फ़ॉलबैक)
+    SECRET_KEY: str = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or "cloudbot_super_secret_jwt_key_2026"
+    JWT_SECRET_KEY: str = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or "cloudbot_super_secret_jwt_key_2026"
+    ALGORITHM: str = "HS256"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
 
