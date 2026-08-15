@@ -1,4 +1,5 @@
 import re
+import html
 import json
 import requests
 import xml.etree.ElementTree as ET
@@ -6,13 +7,12 @@ from fastapi import HTTPException
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from youtube_transcript_api import YouTubeTranscriptApi
-import yt_dlp
 from app.db.vector_store import add_documents_to_vector_store
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
 def extract_video_id(url: str) -> str:
-    """Extracts 11-character YouTube video ID safely from standard, short, or shorts URLs."""
+    """Extracts 11-character video ID from any YouTube URL format."""
     clean = str(url).strip()
     patterns = [
         r"(?:v=|\/embed\/|\/v\/|youtu\.be\/|\/shorts\/|^)([a-zA-Z0-9_-]{11})(?:\?|&|$|\/)",
@@ -22,127 +22,109 @@ def extract_video_id(url: str) -> str:
         match = re.search(pattern, clean)
         if match:
             return match.group(1)
-    raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: '{url}'")
+    raise HTTPException(status_code=400, detail=f"Invalid YouTube URL format: {url}")
 
-def _fetch_subtitles_direct_html(video_id: str) -> str:
-    """Bypasses datacenter bot blocks by fetching captions directly from public YouTube HTML player response."""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
+def _fetch_subtitles_innertube(video_id: str) -> str:
+    """Extracts full transcript via YouTube InnerTube API (Bypasses Datacenter IP restrictions)."""
+    url = "https://www.youtube.com/youtubei/v1/player"
+    payload = {
+        "context": {
+            "client": {
+                "clientName": "WEB_EMBEDDED_PLAYER",
+                "clientVersion": "1.20240318.01.00",
+                "hl": "en",
+                "gl": "US"
+            }
+        },
+        "videoId": video_id
     }
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Content-Type": "application/json"
+    }
+
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if "captionTracks" not in resp.text:
+        resp = requests.post(url, json=payload, headers=headers, timeout=12)
+        if resp.status_code != 200:
             return ""
 
-        match = re.search(r'"captionTracks":\s*(\[.*?\])', resp.text)
-        if not match:
-            return ""
-
-        tracks = json.loads(match.group(1))
+        data = resp.json()
+        captions = data.get("captions", {}).get("playerCaptionsTracklistRenderer", {})
+        tracks = captions.get("captionTracks", [])
         if not tracks:
             return ""
 
-        base_url = tracks[0].get("baseUrl")
+        # Priority language selection
+        selected_track = tracks[0]
         for track in tracks:
-            if track.get("languageCode") in ["en", "en-US", "en-GB", "hi"]:
-                base_url = track.get("baseUrl")
+            lang = track.get("languageCode", "").lower()
+            if lang in ["en", "en-us", "en-gb", "hi"]:
+                selected_track = track
                 break
 
+        base_url = selected_track.get("baseUrl")
         if not base_url:
             return ""
 
-        caption_resp = requests.get(base_url, headers=headers, timeout=10)
-        root = ET.fromstring(caption_resp.text)
-        texts = [elem.text for elem in root.findall(".//text") if elem.text]
+        sub_resp = requests.get(base_url, headers=headers, timeout=12)
+        root = ET.fromstring(sub_resp.text)
+        texts = [html.unescape(elem.text) for elem in root.findall(".//text") if elem.text]
         return " ".join(texts)
     except Exception:
         return ""
 
-def _fetch_via_ytdlp(clean_url: str) -> str:
-    """Extracts captions using yt-dlp."""
-    ydl_opts = {
-        'skip_download': True,
-        'writesubtitles': True,
-        'writeautomaticsub': True,
-        'subtitleslangs': ['en', 'en-US', 'en-GB', 'hi'],
-        'quiet': True,
-        'no_warnings': True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(clean_url, download=False)
-            subtitles = info.get('subtitles', {}) or info.get('automatic_captions', {})
-            if not subtitles:
-                return ""
-
-            selected_track = None
-            for lang in ['en', 'en-US', 'en-GB', 'hi']:
-                if lang in subtitles:
-                    selected_track = subtitles[lang]
-                    break
-            if not selected_track:
-                selected_track = list(subtitles.values())[0]
-
-            sub_url = selected_track[0].get('url')
-            if sub_url:
-                resp = requests.get(sub_url, timeout=10)
-                if resp.status_code == 200:
-                    clean_text = re.sub(r'<[^>]+>', '', resp.text)
-                    clean_text = re.sub(r'\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}', '', clean_text)
-                    return " ".join(clean_text.split())
-    except Exception:
-        pass
-    return ""
-
-def process_youtube_video(bot_id: str, url: str) -> int:
-    """Processes video transcripts with multi-layer fallback and saves them into ChromaDB."""
-    video_id = extract_video_id(url)
-    clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    raw_text = ""
-
-    # Method 1: YouTubeTranscriptApi
+def _fetch_via_transcript_api(video_id: str) -> str:
+    """Extracts full transcript using YouTubeTranscriptApi with comprehensive language matching."""
     try:
         try:
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'hi'])
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB', 'hi'])
         except Exception:
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-        raw_text = " ".join([item.get("text", "") for item in transcript_list])
+        
+        return " ".join([item.get("text", "") for item in transcript_list])
     except Exception:
         pass
-
-    # Method 2: Direct TimedText HTML Scrape (Bypasses IP/Bot block)
-    if not raw_text or not raw_text.strip():
-        raw_text = _fetch_subtitles_direct_html(video_id)
-
-    # Method 3: yt-dlp fallback
-    if not raw_text or not raw_text.strip():
-        raw_text = _fetch_via_ytdlp(clean_url)
-
-    # Method 4: Fallback Video Metadata extraction if captions are heavily blocked
-    if not raw_text or not raw_text.strip():
+    
+    # Try list_transcripts iterator
+    try:
+        transcript_obj = YouTubeTranscriptApi.list_transcripts(video_id)
         try:
-            headers = {"User-Agent": "Mozilla/5.0"}
-            resp = requests.get(f"https://noembed.com/embed?url={clean_url}", headers=headers, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                title = data.get("title", "")
-                author = data.get("author_name", "")
-                if title:
-                    raw_text = f"YouTube Video Title: {title}. Video Creator / Channel: {author}. Content overview and discussion for video id {video_id}."
+            t = transcript_obj.find_transcript(['en', 'en-US', 'hi'])
         except Exception:
-            pass
+            t = transcript_obj.find_generated_transcript(['en', 'hi'])
+        data = t.fetch()
+        return " ".join([item.get("text", "") for item in data])
+    except Exception:
+        return ""
 
-    if not raw_text or not raw_text.strip():
+def process_youtube_video(bot_id: str, url: str) -> int:
+    """Extracts complete transcript, splits into chunks, and stores into ChromaDB."""
+    video_id = extract_video_id(url)
+    clean_url = f"https://www.youtube.com/watch?v={video_id}"
+    full_transcript = ""
+
+    # Strategy 1: YouTubeTranscriptApi
+    full_transcript = _fetch_via_transcript_api(video_id)
+
+    # Strategy 2: Direct InnerTube Scraping (Cloud Datacenter Compatible)
+    if not full_transcript or len(full_transcript.strip()) < 50:
+        full_transcript = _fetch_subtitles_innertube(video_id)
+
+    # Validate extracted content
+    if not full_transcript or not full_transcript.strip():
         raise HTTPException(
             status_code=400,
-            detail=f"Unable to extract captions for video ({video_id}). Please test with a video that has public subtitles/CC enabled."
+            detail=f"Unable to extract captions for video ({video_id}). Please ensure the video has public English/Hindi subtitles/CC enabled."
         )
 
-    # Save to Vector Store
-    doc = Document(page_content=raw_text, metadata={"source": clean_url, "video_id": video_id})
+    # Create document and split into multi-part chunks
+    doc = Document(
+        page_content=full_transcript.strip(),
+        metadata={"source": clean_url, "video_id": video_id}
+    )
     chunks = text_splitter.split_documents([doc])
+    
+    # Store all chunks into Vector DB
     add_documents_to_vector_store(chunks, bot_id)
 
     return len(chunks)
