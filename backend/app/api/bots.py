@@ -33,10 +33,40 @@ def get_user_bots(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return db.query(Bot).filter(Bot.user_id == current_user.id).all()
+    user_bots = db.query(Bot).filter(Bot.user_id == current_user.id).all()
+    
+    # Always guarantee Default Assistant (test_bot_1) is present
+    has_default = any(b.id == "test_bot_1" for b in user_bots)
+    if not has_default:
+        default_bot = db.query(Bot).filter(Bot.id == "test_bot_1").first()
+        if not default_bot:
+            default_bot = Bot(
+                id="test_bot_1",
+                user_id=current_user.id,
+                name="Default Assistant",
+                system_prompt="You are a helpful AI assistant.",
+                temperature=0.2
+            )
+            db.add(default_bot)
+            db.commit()
+            db.refresh(default_bot)
+        user_bots.insert(0, default_bot)
+
+    return user_bots
 
 @router.get("/{bot_id}", response_model=BotResponse)
 def get_bot_details(bot_id: str, db: Session = Depends(get_db)):
+    if bot_id == "test_bot_1":
+        default_bot = db.query(Bot).filter(Bot.id == "test_bot_1").first()
+        if not default_bot:
+            return BotResponse(
+                id="test_bot_1",
+                name="Default Assistant",
+                system_prompt="You are a helpful AI assistant.",
+                temperature=0.2
+            )
+        return default_bot
+
     bot = db.query(Bot).filter(Bot.id == bot_id).first()
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found.")
