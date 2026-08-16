@@ -12,9 +12,9 @@ yt-dlp
 chromadb
 langchain-chroma
 langchain-core
-langchain-community
 langchain-text-splitters
 PyJWT
 bcrypt
 email-validator
 python-multipart
+groq
