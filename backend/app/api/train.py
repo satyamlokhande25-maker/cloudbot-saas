@@ -42,7 +42,8 @@ def train_youtube_endpoint(request: YouTubeTrainRequest):
 @router.post("/pdf/{bot_id}", response_model=TrainResponse)
 async def train_pdf_endpoint(bot_id: str, file: UploadFile = File(...)):
     try:
-        chunks_count = process_pdf_file(bot_id, file)
+        # Added await to resolve the async coroutine properly
+        chunks_count = await process_pdf_file(bot_id, file)
         return TrainResponse(
             status="success",
             message="PDF processed successfully.",
