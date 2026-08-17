@@ -39,7 +39,6 @@ export default function App() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBotName, setNewBotName] = useState('');
   const [newBotPrompt, setNewBotPrompt] = useState('You are a helpful AI customer support assistant.');
-  const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
   const [dashboardTab, setDashboardTab] = useState<'train' | 'logs'>('train');
@@ -97,7 +96,6 @@ export default function App() {
       const created = await createNewBot({
         name: newBotName.trim(),
         system_prompt: newBotPrompt,
-        theme_color: newBotColor,
       });
       setBots((prev) => [...prev, created]);
       setActiveBot(created);
@@ -191,15 +189,19 @@ export default function App() {
     try {
       const res = await askBot(activeBot.id, userMsg);
       setMessages((prev) => [...prev, { role: 'bot', text: res.answer }]);
-    } catch {
-      setMessages((prev) => [...prev, { role: 'bot', text: 'Error: Could not retrieve answer.' }]);
+    } catch (err: any) {
+      // 🔹 फ्री-टियर लिमिट (429) या सामान्य एरर को सेफ़ली हैंडल करना
+      const errorText = err.response?.status === 429 
+        ? '⚠️ Free tier message limit reached (50/50). Please contact support to continue.' 
+        : 'Error: Could not retrieve answer.';
+      setMessages((prev) => [...prev, { role: 'bot', text: errorText }]);
     } finally {
       setIsChatLoading(false);
     }
   };
 
   const widgetSnippet = `<script 
-  src="http://localhost:3000/widget.js" 
+  src="https://cloudbot-saas.onrender.com/widget.js" 
   data-bot-id="${activeBot?.id || 'test_bot_1'}" 
   defer>
 </script>`;
