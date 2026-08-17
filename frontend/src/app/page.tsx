@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
-  CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus
+  CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
+  Palette, Share2, Layers, MessageCircle, Sliders, ExternalLink
 } from 'lucide-react';
 import { 
   registerUser, 
@@ -39,9 +40,11 @@ export default function App() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBotName, setNewBotName] = useState('');
   const [newBotPrompt, setNewBotPrompt] = useState('You are a helpful AI customer support assistant.');
+  const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
-  const [dashboardTab, setDashboardTab] = useState<'train' | 'logs'>('train');
+  // Navigation: FastBots Style Hub Tabs
+  const [dashboardTab, setDashboardTab] = useState<'train' | 'logs' | 'appearance' | 'integrations'>('train');
   const [activeTab, setActiveTab] = useState<'website' | 'youtube' | 'pdf'>('website');
   
   // Ingestion States
@@ -61,6 +64,11 @@ export default function App() {
   // Chat Logs State
   const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; created_at: string }>>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
+
+  // Appearance States
+  const [customThemeColor, setCustomThemeColor] = useState('#4f46e5');
+  const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
+  const [appearanceSaved, setAppearanceSaved] = useState(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
@@ -96,6 +104,7 @@ export default function App() {
       const created = await createNewBot({
         name: newBotName.trim(),
         system_prompt: newBotPrompt,
+        theme_color: newBotColor,
       });
       setBots((prev) => [...prev, created]);
       setActiveBot(created);
@@ -190,7 +199,6 @@ export default function App() {
       const res = await askBot(activeBot.id, userMsg);
       setMessages((prev) => [...prev, { role: 'bot', text: res.answer }]);
     } catch (err: any) {
-      // 🔹 फ्री-टियर लिमिट (429) या सामान्य एरर को सेफ़ली हैंडल करना
       const errorText = err.response?.status === 429 
         ? '⚠️ Free tier message limit reached (50/50). Please contact support to continue.' 
         : 'Error: Could not retrieve answer.';
@@ -330,20 +338,37 @@ export default function App() {
             </select>
           </div>
 
-          {/* Navigation Links */}
-          <div className="space-y-2 mb-6">
+          {/* Navigation Menu (FastBots Inspired) */}
+          <div className="space-y-1.5 mb-6">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</p>
             <button
               onClick={() => setDashboardTab('train')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                dashboardTab === 'train' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'train' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <Sparkles className="w-4 h-4" /> Training & Playground
             </button>
             <button
+              onClick={() => setDashboardTab('appearance')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'appearance' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Palette className="w-4 h-4" /> Appearance & Theme
+            </button>
+            <button
+              onClick={() => setDashboardTab('integrations')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'integrations' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Layers className="w-4 h-4" /> Integrations
+            </button>
+            <button
               onClick={() => setDashboardTab('logs')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                dashboardTab === 'logs' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'logs' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <History className="w-4 h-4" /> Conversation Logs
@@ -381,7 +406,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full">
-        {dashboardTab === 'train' ? (
+        {dashboardTab === 'train' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Column: Data Ingestion */}
             <div className="lg:col-span-6 space-y-6">
@@ -549,8 +574,137 @@ export default function App() {
               </div>
             </div>
           </div>
-        ) : (
-          /* Conversation Logs Tab */
+        )}
+
+        {/* Tab 2: Appearance & Theme Customizer */}
+        {dashboardTab === 'appearance' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-2">
+                <Palette className="w-5 h-5 text-indigo-400" /> Widget Customization
+              </h2>
+              <p className="text-xs text-slate-400 mb-6">Customize the look and brand identity of your chatbot widget.</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Primary Theme Color</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="color" 
+                      value={customThemeColor} 
+                      onChange={(e) => setCustomThemeColor(e.target.value)}
+                      className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
+                    />
+                    <input 
+                      type="text" 
+                      value={customThemeColor} 
+                      onChange={(e) => setCustomThemeColor(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Welcome Message</label>
+                  <textarea 
+                    rows={2}
+                    value={welcomeMessage}
+                    onChange={(e) => setWelcomeMessage(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none"
+                  />
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setAppearanceSaved(true);
+                    setTimeout(() => setAppearanceSaved(false), 2000);
+                  }}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium transition flex items-center justify-center gap-2"
+                >
+                  {appearanceSaved ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : 'Save Appearance'}
+                </button>
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center">
+              <p className="text-xs text-slate-400 mb-4 font-semibold">Live Widget Preview</p>
+              <div className="w-72 bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-2xl">
+                <div style={{ backgroundColor: customThemeColor }} className="p-3 rounded-xl text-white font-bold text-xs flex items-center justify-between mb-4">
+                  <span>{activeBot?.name || 'Assistant'}</span>
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full" />
+                </div>
+                <div className="bg-slate-900 p-3 rounded-xl text-xs text-slate-200 mb-3 border border-slate-800">
+                  {welcomeMessage}
+                </div>
+                <div className="h-8 bg-slate-900 rounded-lg border border-slate-800 flex items-center px-2 text-[10px] text-slate-500">
+                  Type a reply...
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Integrations Hub (FastBots Style) */}
+        {dashboardTab === 'integrations' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div className="mb-6 pb-4 border-b border-slate-800">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-400" /> Native Integrations
+              </h2>
+              <p className="text-xs text-slate-400">Connect your trained bot directly to external channels and apps.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* WhatsApp */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">🟢</span>
+                    <span className="text-[10px] bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-semibold">Ready</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-white mb-1">WhatsApp Business</h3>
+                  <p className="text-xs text-slate-400 mb-4">Connect your bot with WhatsApp Cloud API to automate 24/7 client messages.</p>
+                </div>
+                <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
+                  Configure
+                </button>
+              </div>
+
+              {/* WordPress */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">🌐</span>
+                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-white mb-1">WordPress / Web Embed</h3>
+                  <p className="text-xs text-slate-400 mb-4">One-line script integration for any WordPress, Webflow, or Shopify site.</p>
+                </div>
+                <button onClick={copyWidgetCode} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition">
+                  Copy Script Code
+                </button>
+              </div>
+
+              {/* Webhooks / Zapier */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">⚡</span>
+                    <span className="text-[10px] bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-semibold">Ready</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-white mb-1">Zapier / Webhooks</h3>
+                  <p className="text-xs text-slate-400 mb-4">Send chat leads and logs straight into Google Sheets or your CRM.</p>
+                </div>
+                <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
+                  Manage Webhook
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Conversation Logs */}
+        {dashboardTab === 'logs' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
               <div>
