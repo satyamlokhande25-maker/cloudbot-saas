@@ -3,9 +3,9 @@ from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.core.config import settings
 
-# 🔹 Google Gemini Production Embeddings (High Semantic Accuracy & Zero RAM overhead on Render)
+# 🔹 बिना 'models/' प्रीफ़िक्स के सही मॉडल नाम
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",
+    model="text-embedding-004",
     google_api_key=settings.GOOGLE_API_KEY
 )
 
