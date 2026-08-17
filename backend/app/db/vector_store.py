@@ -1,67 +1,73 @@
 import os
-import requests
+import google.generativeai as genai
 from typing import List
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 from app.core.config import settings
 
-class FastGoogleEmbeddings(Embeddings):
-    """Ultra-fast batch Google GenAI embeddings with strict timeout prevention."""
-    def __init__(self, api_key: str):
-        self.api_key = str(api_key).strip()
+# Google GenAI API Configure
+genai.configure(api_key=str(settings.GOOGLE_API_KEY).strip())
+
+class OfficialGoogleEmbeddings(Embeddings):
+    """Official Google Generative AI batch embeddings for exact semantic retrieval."""
+    def __init__(self):
+        self.model = "models/text-embedding-004"
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        if not self.api_key or not texts:
-            return [[0.0] * 768 for _ in texts]
-
-        # 🔹 Send in batches of 40 chunks per request
+        if not texts:
+            return []
+        
         batch_size = 40
         all_embeddings = []
-        headers = {"Content-Type": "application/json"}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key={self.api_key}"
-
+        
         for i in range(0, len(texts), batch_size):
-            chunk_batch = texts[i:i + batch_size]
-            payload = {
-                "requests": [
-                    {
-                        "model": "models/text-embedding-004",
-                        "content": {"parts": [{"text": t[:1000] if t else " "}]}
-                    }
-                    for t in chunk_batch
-                ]
-            }
+            chunk_batch = [t[:1800] if t else " " for t in texts[i:i + batch_size]]
             try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json().get("embeddings", [])
-                    for item in data:
-                        all_embeddings.append(item.get("values", [0.0] * 768))
-                else:
-                    all_embeddings.extend([[0.0] * 768 for _ in chunk_batch])
+                res = genai.embed_content(
+                    model=self.model,
+                    content=chunk_batch,
+                    task_type="retrieval_document"
+                )
+                embeddings = res.get("embedding", [])
+                all_embeddings.extend(embeddings)
             except Exception:
-                all_embeddings.extend([[0.0] * 768 for _ in chunk_batch])
-
+                # Fallback to embedding-001
+                try:
+                    res = genai.embed_content(
+                        model="models/embedding-001",
+                        content=chunk_batch,
+                        task_type="retrieval_document"
+                    )
+                    all_embeddings.extend(res.get("embedding", []))
+                except Exception:
+                    all_embeddings.extend([[0.0] * 768 for _ in chunk_batch])
+                    
         return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={self.api_key}"
+        clean_text = text[:1800] if text else " "
         try:
-            resp = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json={"content": {"parts": [{"text": text[:1000] if text else " "}]}},
-                timeout=6
+            res = genai.embed_content(
+                model=self.model,
+                content=clean_text,
+                task_type="retrieval_query"
             )
-            if resp.status_code == 200:
-                return resp.json().get("embedding", {}).get("values", [0.0] * 768)
+            return res.get("embedding", [])
         except Exception:
-            pass
-        return [0.0] * 768
+            try:
+                res = genai.embed_content(
+                    model="models/embedding-001",
+                    content=clean_text,
+                    task_type="retrieval_query"
+                )
+                return res.get("embedding", [])
+            except Exception:
+                return [0.0] * 768
 
-embeddings = FastGoogleEmbeddings(api_key=settings.GOOGLE_API_KEY)
+embeddings = OfficialGoogleEmbeddings()
 
 def get_vector_store(bot_id: str) -> Chroma:
+    """Returns an isolated ChromaDB vector store instance for a specific bot."""
     bot_persist_dir = os.path.join(settings.CHROMA_PATH, bot_id)
     os.makedirs(bot_persist_dir, exist_ok=True)
     return Chroma(
@@ -71,5 +77,6 @@ def get_vector_store(bot_id: str) -> Chroma:
     )
 
 def add_documents_to_vector_store(documents: list, bot_id: str):
+    """Embeds and saves document chunks into the Chroma collection."""
     vector_store = get_vector_store(bot_id)
     vector_store.add_documents(documents=documents)
