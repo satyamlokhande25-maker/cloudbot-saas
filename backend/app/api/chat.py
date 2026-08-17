@@ -12,24 +12,24 @@ router = APIRouter(prefix="/chat", tags=["Chat & Inference"])
 @router.post("/", response_model=ChatResponse)
 def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
     try:
-        # 1. Bot और Owner (User) की जानकारी निकालें
+        
         bot = db.query(Bot).filter(Bot.id == request.bot_id).first()
         if bot and bot.owner:
             user = bot.owner
-            # 2. फ्री टियर लिमिट चेक करें (उदा. 50 मैसेज)
+            
             if user.message_count >= user.message_limit:
                 raise HTTPException(
                     status_code=429,
                     detail="Free tier message limit reached (50/50). Please upgrade or reset to continue."
                 )
-            # यूज़र का यूसेज काउंट बढ़ाएँ
+            
             user.message_count += 1
             db.commit()
 
-        # 3. RAG पाइपलाइन से जवाब जनरेट करें
-        answer = generate_rag_response(bot_id=request.bot_id, question=request.question)
         
-        # 4. मैसेज डेटाबेस में सेव करें
+        answer = generate_rag_response(bot_id=request.bot_id, question=request.question)
+
+        
         user_msg = ChatMessage(
             id=f"msg_{uuid.uuid4().hex[:12]}",
             bot_id=request.bot_id,

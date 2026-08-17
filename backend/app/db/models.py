@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Float, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, Float, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.database import Base
@@ -9,6 +9,8 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    message_count = Column(Integer, default=0)  # 🔹 Free tier usage counter
+    message_limit = Column(Integer, default=50) # 🔹 Free limit (50 messages)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     bots = relationship("Bot", back_populates="owner")
