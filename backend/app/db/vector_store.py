@@ -1,13 +1,16 @@
 import os
 from langchain_chroma import Chroma
-from langchain_core.embeddings import FakeEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.core.config import settings
 
-# Render Free Tier (512MB RAM) ke liye ultra-lightweight embeddings
-embeddings = FakeEmbeddings(size=384)
+# 🔹 Google Gemini Production Embeddings (High Semantic Accuracy & Zero RAM overhead on Render)
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/text-embedding-004",
+    google_api_key=settings.GOOGLE_API_KEY
+)
 
 def get_vector_store(bot_id: str) -> Chroma:
-    """Returns the ChromaDB collection instance for a specific bot in an isolated directory."""
+    """Returns an isolated ChromaDB vector store instance for a specific bot."""
     bot_persist_dir = os.path.join(settings.CHROMA_PATH, bot_id)
     os.makedirs(bot_persist_dir, exist_ok=True)
     return Chroma(
@@ -17,6 +20,6 @@ def get_vector_store(bot_id: str) -> Chroma:
     )
 
 def add_documents_to_vector_store(documents: list, bot_id: str):
-    """Adds and appends new document chunks to the existing vector store collection."""
+    """Embeds and appends new document chunks into the bot's Chroma collection."""
     vector_store = get_vector_store(bot_id)
     vector_store.add_documents(documents=documents)
