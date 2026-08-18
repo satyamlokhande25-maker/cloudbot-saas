@@ -1,9 +1,9 @@
 (function () {
   const BACKEND_API_URL = "https://cloudbot-saas.onrender.com";
-
   const currentScript = document.currentScript || document.querySelector('script[data-bot-id]');
   const botId = (currentScript && currentScript.getAttribute('data-bot-id')) || 'test_bot_1';
 
+  // Inject Styles
   const style = document.createElement('style');
   style.innerHTML = `
     #cloudbot-widget-container {
@@ -11,7 +11,7 @@
       bottom: 24px;
       right: 24px;
       z-index: 999999;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #cloudbot-toggle-btn {
       width: 56px;
@@ -27,10 +27,7 @@
       justify-content: center;
       transition: transform 0.2s, background 0.2s;
     }
-    #cloudbot-toggle-btn:hover {
-      transform: scale(1.05);
-      background: #4338ca;
-    }
+    #cloudbot-toggle-btn:hover { transform: scale(1.05); background: #4338ca; }
     #cloudbot-chat-window {
       display: none;
       flex-direction: column;
@@ -60,7 +57,6 @@
       color: #94a3b8;
       font-size: 18px;
       cursor: pointer;
-      line-height: 1;
     }
     #cloudbot-messages {
       flex: 1;
@@ -109,9 +105,7 @@
       font-size: 13px;
       outline: none;
     }
-    #cloudbot-input:focus {
-      border-color: #6366f1;
-    }
+    #cloudbot-input:focus { border-color: #6366f1; }
     #cloudbot-send-btn {
       background: #4f46e5;
       color: white;
@@ -122,13 +116,11 @@
       font-size: 13px;
       font-weight: 500;
     }
-    #cloudbot-send-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    #cloudbot-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   `;
   document.head.appendChild(style);
 
+  // Widget Markup
   const container = document.createElement('div');
   container.id = 'cloudbot-widget-container';
   container.innerHTML = `
@@ -160,19 +152,18 @@
   const input = document.getElementById('cloudbot-input');
   const sendBtn = document.getElementById('cloudbot-send-btn');
 
-  function toggleChat() {
+  toggleBtn.onclick = () => {
     const isVisible = chatWindow.style.display === 'flex';
     chatWindow.style.display = isVisible ? 'none' : 'flex';
     if (!isVisible) input.focus();
-  }
-
-  toggleBtn.addEventListener('click', toggleChat);
-  closeBtn.addEventListener('click', () => { chatWindow.style.display = 'none'; });
+  };
+  closeBtn.onclick = () => { chatWindow.style.display = 'none'; };
 
   async function sendMessage() {
     const question = input.value.trim();
     if (!question) return;
 
+    // Append User Message
     const userDiv = document.createElement('div');
     userDiv.className = 'cb-msg cb-user';
     userDiv.textContent = question;
@@ -180,6 +171,7 @@
     input.value = '';
     sendBtn.disabled = true;
 
+    // Loading State
     const botLoading = document.createElement('div');
     botLoading.className = 'cb-msg cb-bot';
     botLoading.textContent = 'Thinking...';
@@ -196,24 +188,18 @@
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        if (response.status === 429) {
-          botLoading.textContent = "⚠️ Message limit reached (50/50) for this bot.";
-        } else {
-          botLoading.textContent = (data && data.detail) || `Server error (${response.status}).`;
-        }
+        botLoading.textContent = (data && data.detail) || `Server status: ${response.status}`;
       } else {
         botLoading.textContent = (data && data.answer) || "I do not have enough information from the provided content.";
       }
     } catch (err) {
-      botLoading.textContent = "Server is waking up. Please resend your message in 10 seconds.";
+      botLoading.textContent = "Server is waking up (Render Free Tier). Please ask again in 5 seconds.";
     } finally {
       sendBtn.disabled = false;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
   }
 
-  sendBtn.addEventListener('click', sendMessage);
-  input.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') sendMessage();
-  });
+  sendBtn.onclick = sendMessage;
+  input.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 })();

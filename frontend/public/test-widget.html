@@ -2,46 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>External Client Website - CloudBot Test</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #0f172a;
-      color: #f8fafc;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .card {
-      background-color: #1e293b;
-      padding: 32px;
-      border-radius: 16px;
-      border: 1px solid #334155;
-      text-align: center;
-      max-width: 500px;
-    }
-    h1 { color: #6366f1; margin-bottom: 8px; font-size: 24px; }
-    p { color: #94a3b8; font-size: 14px; line-height: 1.5; }
-  </style>
+  <title>CloudBot Widget Test</title>
 </head>
-<body>
-
-  <div class="card">
-    <h1>🚀 Client Portal Integration</h1>
-    <p>This external webpage is running the live CloudBot embeddable widget.</p>
-    <p>Look at the <strong>bottom-right corner</strong> to open the floating chat bubble and test.</p>
+<body style="background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
+  <div style="text-align: center; padding: 30px; background: #1e293b; border-radius: 12px;">
+    <h2>🚀 Live Widget Testing</h2>
+    <p>Look at the bottom right corner to test the chat widget.</p>
   </div>
 
-  <!-- Bot ID: bot_468e10f2 (HR ASSISTANT) -->
+  <!-- Bot ID: Replace with your exact active bot ID -->
   <script 
-    src="https://cloudbot-saas.vercel.app/widget.js" 
+    src="https://cloudbot-saas.vercel.app/widget.js?v=2" 
     data-bot-id="bot_468e10f2" 
     defer>
   </script>
-
 </body>
-</html>
