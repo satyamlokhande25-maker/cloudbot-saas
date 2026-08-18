@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X, ExternalLink, Zap, ShieldAlert
+  Palette, Layers, X
 } from 'lucide-react';
 import { 
   registerUser, 
@@ -59,7 +59,6 @@ export default function App() {
   ]);
   const [inputQuery, setInputQuery] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // Chat Logs State
   const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; created_at: string }>>([]);
@@ -70,11 +69,11 @@ export default function App() {
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
   const [appearanceSaved, setAppearanceSaved] = useState(false);
 
-  // Integration Modal States
+  // Interactive Integration Modals
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [tgToken, setTgToken] = useState('');
-  const [tgSaved, setTgSaved] = useState(false);
+  const [tgConnected, setTgConnected] = useState(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
@@ -226,7 +225,7 @@ export default function App() {
       setMessages((prev) => [...prev, { role: 'bot', text: res.answer }]);
     } catch (err: any) {
       const errorText = err.response?.status === 429 
-        ? '⚠️ Free tier message limit reached (50/50). Please upgrade or contact support.' 
+        ? '⚠️ Free tier message limit reached (50/50). Please contact support to continue.' 
         : 'Error: Could not retrieve answer.';
       setMessages((prev) => [...prev, { role: 'bot', text: errorText }]);
     } finally {
@@ -240,7 +239,7 @@ export default function App() {
   defer>
 </script>`;
 
-  const copyText = (text: string, key: string) => {
+  const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
@@ -378,7 +377,7 @@ export default function App() {
             </select>
           </div>
 
-          {/* Navigation Menu */}
+          {/* Workspace Tabs */}
           <div className="space-y-1.5 mb-6">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</p>
             <button
@@ -403,7 +402,7 @@ export default function App() {
                 dashboardTab === 'integrations' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <Layers className="w-4 h-4" /> Integrations Hub
+              <Layers className="w-4 h-4" /> Integrations
             </button>
             <button
               onClick={() => handleTabChange('logs')}
@@ -423,10 +422,10 @@ export default function App() {
                 <Code2 className="w-4 h-4 text-indigo-400" /> Embed Widget
               </span>
               <button 
-                onClick={() => copyText(widgetSnippet, 'sidebar_snippet')} 
+                onClick={() => copyToClipboard(widgetSnippet, 'sidebar')} 
                 className="text-slate-400 hover:text-white transition"
               >
-                {copiedKey === 'sidebar_snippet' ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                {copiedKey === 'sidebar' ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
             <pre className="bg-slate-900 p-2 rounded text-[10px] text-indigo-300 font-mono overflow-x-auto">
@@ -443,7 +442,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full">
         {/* Tab 1: Training & Playground */}
         {dashboardTab === 'train' && (
@@ -556,7 +555,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Live Chat Playground */}
+            {/* Chat Playground */}
             <div className="lg:col-span-6">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col h-[580px]">
                 <div className="border-b border-slate-800 pb-4 mb-4 flex items-center justify-between">
@@ -684,15 +683,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: FastBots Complete Integrations Hub */}
+        {/* Tab 3: Native Integrations (Full Interactive Hub) */}
         {dashboardTab === 'integrations' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div className="mb-6 pb-4 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-indigo-400" /> Integrations & Channel Deployments
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-400" /> Native Integrations
                 </h2>
-                <p className="text-xs text-slate-400">Connect your trained bot across multiple channels (Free & Pro tiers).</p>
+                <p className="text-xs text-slate-400">Connect your trained bot directly to external channels and apps.</p>
               </div>
               <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 px-3 py-1.5 rounded-lg font-mono">
                 Active Bot: {activeBot?.id || 'test_bot_1'}
@@ -700,114 +699,58 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {/* 1. Telegram Bot (100% Free) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+              {/* WhatsApp Card */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">✈️</span>
-                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">100% Free</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-white mb-1">Telegram Bot</h3>
-                  <p className="text-xs text-slate-400 mb-4">Connect your AI bot directly with Telegram using @BotFather API token.</p>
-                </div>
-                <button 
-                  onClick={() => setActiveModal('telegram')}
-                  className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold transition"
-                >
-                  Configure Telegram
-                </button>
-              </div>
-
-              {/* 2. WordPress / Website Script (100% Free) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">🌐</span>
-                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">100% Free</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-white mb-1">WordPress / Web Embed</h3>
-                  <p className="text-xs text-slate-400 mb-4">Embed floating chat bubble to any WordPress, Webflow, Shopify or custom HTML site.</p>
-                </div>
-                <button 
-                  onClick={() => setActiveModal('wordpress')}
-                  style={{ backgroundColor: customThemeColor }}
-                  className="w-full py-2 hover:opacity-90 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5"
-                >
-                  Get Embed Code
-                </button>
-              </div>
-
-              {/* 3. WhatsApp Cloud API (Free Tier Meta API) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">💬</span>
+                    <span className="text-2xl">🟢</span>
                     <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">1,000 Free / mo</span>
                   </div>
                   <h3 className="font-bold text-sm text-white mb-1">WhatsApp Business</h3>
-                  <p className="text-xs text-slate-400 mb-4">Connect with official Meta WhatsApp Cloud API for 24/7 client response.</p>
+                  <p className="text-xs text-slate-400 mb-4">Connect your bot with WhatsApp Cloud API to automate 24/7 client messages.</p>
                 </div>
                 <button 
                   onClick={() => setActiveModal('whatsapp')}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition"
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Configure WhatsApp
                 </button>
               </div>
 
-              {/* 4. Zapier & Make.com Webhook (100% Free) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+              {/* WordPress Card */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">🌐</span>
+                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Active</span>
+                  </div>
+                  <h3 className="font-bold text-sm text-white mb-1">WordPress / Web Embed</h3>
+                  <p className="text-xs text-slate-400 mb-4">One-line script integration for any WordPress, Webflow, or Shopify site.</p>
+                </div>
+                <button 
+                  onClick={() => setActiveModal('wordpress')}
+                  style={{ backgroundColor: customThemeColor }}
+                  className="w-full py-2.5 hover:opacity-90 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Get Embed Code
+                </button>
+              </div>
+
+              {/* Zapier / Webhooks Card */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-2xl">⚡</span>
-                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">REST API</span>
+                    <span className="text-[10px] bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-semibold">REST API</span>
                   </div>
-                  <h3 className="font-bold text-sm text-white mb-1">Make / Zapier Webhook</h3>
-                  <p className="text-xs text-slate-400 mb-4">Send chat queries, collect leads, and trigger automations in Google Sheets & CRM.</p>
+                  <h3 className="font-bold text-sm text-white mb-1">Zapier / Webhooks</h3>
+                  <p className="text-xs text-slate-400 mb-4">Send chat leads and logs straight into Google Sheets or your CRM via API.</p>
                 </div>
                 <button 
                   onClick={() => setActiveModal('webhook')}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition"
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
-                  View Webhook Endpoint
-                </button>
-              </div>
-
-              {/* 5. Slack Workspace Bot (Free Developer App) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">💼</span>
-                    <span className="text-[10px] bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Free App</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-white mb-1">Slack Workspace</h3>
-                  <p className="text-xs text-slate-400 mb-4">Add your CloudBot AI into team Slack channels for internal company knowledge search.</p>
-                </div>
-                <button 
-                  onClick={() => setActiveModal('slack')}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition"
-                >
-                  Configure Slack
-                </button>
-              </div>
-
-              {/* 6. Instagram & Messenger (Pro Tier / Paid Add-on) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden">
-                <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
-                  PRO Plan ($19/mo)
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">📸</span>
-                  </div>
-                  <h3 className="font-bold text-sm text-white mb-1">Instagram & Messenger</h3>
-                  <p className="text-xs text-slate-400 mb-4">Auto-reply to Instagram DMs and Facebook page comments directly via AI.</p>
-                </div>
-                <button 
-                  onClick={() => setActiveModal('upgrade')}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition"
-                >
-                  Upgrade to Unlock
+                  Manage Webhook
                 </button>
               </div>
             </div>
@@ -869,139 +812,82 @@ export default function App() {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Telegram Modal */}
-            {activeModal === 'telegram' && (
-              <div className="space-y-4">
-                <h3 className="text-base font-bold flex items-center gap-2">✈️ Telegram Bot Setup (100% Free)</h3>
-                <p className="text-xs text-slate-400">Follow these 3 steps to connect your bot with Telegram:</p>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2 text-slate-300">
-                  <p>1. Open Telegram and message <strong>@BotFather</strong>.</p>
-                  <p>2. Send <code>/newbot</code>, give it a name, and copy the API Token provided.</p>
-                  <p>3. Paste token below and connect:</p>
-                </div>
-                <input 
-                  type="text" 
-                  value={tgToken}
-                  onChange={(e) => setTgToken(e.target.value)}
-                  placeholder="Paste Telegram Bot Token (e.g. 71829...)" 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white"
-                />
-                <button 
-                  onClick={() => {
-                    if (tgToken.trim()) {
-                      setTgSaved(true);
-                      setTimeout(() => setActiveModal(null), 1500);
-                    }
-                  }}
-                  className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold"
-                >
-                  {tgSaved ? "✓ Connected to Telegram!" : "Connect Telegram Bot"}
-                </button>
-              </div>
-            )}
-
-            {/* WordPress Modal */}
-            {activeModal === 'wordpress' && (
-              <div className="space-y-4">
-                <h3 className="text-base font-bold flex items-center gap-2">🌐 WordPress / Website Integration</h3>
-                <p className="text-xs text-slate-400">Copy this 3-line embed script and paste it before <code>&lt;/body&gt;</code> in WordPress (via WPCode plugin) or any website:</p>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-indigo-300 break-all">
-                  {widgetSnippet}
-                </div>
-                <button 
-                  onClick={() => copyText(widgetSnippet, 'wp_modal')}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2"
-                >
-                  {copiedKey === 'wp_modal' ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                  {copiedKey === 'wp_modal' ? "Copied Script!" : "Copy Embed Script"}
-                </button>
-              </div>
-            )}
-
-            {/* WhatsApp Modal */}
+            {/* WhatsApp Setup */}
             {activeModal === 'whatsapp' && (
               <div className="space-y-4">
-                <h3 className="text-base font-bold flex items-center gap-2">💬 WhatsApp Cloud API (Meta Free Tier)</h3>
-                <p className="text-xs text-slate-400">Meta provides 1,000 free conversations every month. Use this Callback URL in Meta Developer Dashboard:</p>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-2">
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <span>🟢</span> WhatsApp Cloud API Setup (1,000 Free / mo)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Connect your Meta WhatsApp Business number using your CloudBot webhook URL:
+                </p>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
                   <div className="text-[11px] text-slate-400">Webhook Callback URL:</div>
                   <div className="font-mono text-emerald-400 text-[11px] break-all">
                     https://cloudbot-saas.onrender.com/integrations/telegram/{activeBot?.id || 'test_bot_1'}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400">Go to developers.facebook.com ➔ WhatsApp ➔ Configuration, paste this URL and subscribe to <code>messages</code>.</p>
-                <button onClick={() => setActiveModal(null)} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">Done</button>
-              </div>
-            )}
-
-            {/* Webhook Modal */}
-            {activeModal === 'webhook' && (
-              <div className="space-y-4">
-                <h3 className="text-base font-bold flex items-center gap-2">⚡ Make & Zapier REST Webhook</h3>
-                <p className="text-xs text-slate-400">Send standard POST requests to connect your bot with any CRM, Form, or Google Sheet:</p>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-2">
-                  <div className="text-[11px] text-slate-400">POST URL:</div>
-                  <div className="font-mono text-indigo-300 text-[11px] break-all">https://cloudbot-saas.onrender.com/chat/</div>
-                  <div className="text-[11px] text-slate-400 pt-2">Payload (JSON):</div>
-                  <pre className="text-[10px] text-amber-300 font-mono bg-slate-900 p-2 rounded">
-{`{
-  "bot_id": "${activeBot?.id || 'test_bot_1'}",
-  "question": "Your user query here"
-}`}
-                  </pre>
-                </div>
                 <button 
-                  onClick={() => copyText("https://cloudbot-saas.onrender.com/chat/", 'webhook_url')}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2"
+                  onClick={() => copyToClipboard(`https://cloudbot-saas.onrender.com/integrations/telegram/${activeBot?.id || 'test_bot_1'}`, 'wa_copy')}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
-                  {copiedKey === 'webhook_url' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  Copy Webhook URL
+                  {copiedKey === 'wa_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedKey === 'wa_copy' ? "Copied Callback URL!" : "Copy Callback URL"}
                 </button>
               </div>
             )}
 
-            {/* Slack Modal */}
-            {activeModal === 'slack' && (
+            {/* WordPress Embed */}
+            {activeModal === 'wordpress' && (
               <div className="space-y-4">
-                <h3 className="text-base font-bold flex items-center gap-2">💼 Slack Workspace Setup</h3>
-                <p className="text-xs text-slate-400">Create a free Slack App and set this Request URL in Event Subscriptions:</p>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-                  <div className="text-[11px] text-slate-400 mb-1">Slack Event Request URL:</div>
-                  <div className="font-mono text-amber-300 text-[11px] break-all">
-                    https://cloudbot-saas.onrender.com/integrations/slack/{activeBot?.id || 'test_bot_1'}
-                  </div>
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <span>🌐</span> WordPress & Web Embed Script
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Paste this 3-line embed script before the closing <code>&lt;/body&gt;</code> tag in WordPress (via WPCode plugin) or any website:
+                </p>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-[11px] font-mono text-indigo-300 break-all">
+                  {widgetSnippet}
                 </div>
-                <button onClick={() => setActiveModal(null)} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">Done</button>
+                <button 
+                  onClick={() => copyToClipboard(widgetSnippet, 'wp_copy')}
+                  style={{ backgroundColor: customThemeColor }}
+                  className="w-full py-2.5 hover:opacity-90 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                >
+                  {copiedKey === 'wp_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedKey === 'wp_copy' ? "Copied Script!" : "Copy Script Snippet"}
+                </button>
               </div>
             )}
 
-            {/* Upgrade Modal */}
-            {activeModal === 'upgrade' && (
-              <div className="space-y-4 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mx-auto text-2xl">
-                  🚀
-                </div>
-                <h3 className="text-base font-bold">Upgrade to CloudBot Pro</h3>
-                <p className="text-xs text-slate-400">Unlock Instagram DMs, Facebook Messenger, unlimited messages (10,000+ / mo), and dedicated support.</p>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-left space-y-2 text-xs">
-                  <div className="flex justify-between items-center text-slate-200">
-                    <span>• Unlimited Bots & Embeds</span>
-                    <span className="text-emerald-400 font-bold">Included</span>
+            {/* Webhook / Zapier */}
+            {activeModal === 'webhook' && (
+              <div className="space-y-4">
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <span>⚡</span> REST API & Webhook Configuration
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Send standard POST requests with JSON to query this bot from Zapier, Make, or any CRM:
+                </p>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
+                  <div className="text-[11px] text-slate-400">POST Endpoint:</div>
+                  <div className="font-mono text-indigo-300 text-[11px] break-all">
+                    https://cloudbot-saas.onrender.com/chat/
                   </div>
-                  <div className="flex justify-between items-center text-slate-200">
-                    <span>• 10,000 Messages / month</span>
-                    <span className="text-emerald-400 font-bold">Included</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-200">
-                    <span>• Instagram & Messenger Direct Sync</span>
-                    <span className="text-emerald-400 font-bold">Included</span>
-                  </div>
+                  <div className="text-[11px] text-slate-400 pt-2">Payload (JSON):</div>
+                  <pre className="text-[10px] text-amber-300 font-mono bg-slate-900 p-2 rounded">
+{`{
+  "bot_id": "${activeBot?.id || 'test_bot_1'}",
+  "question": "Your question here"
+}`}
+                  </pre>
                 </div>
                 <button 
-                  onClick={() => alert("Stripe Billing Integration will be linked to your payment gateway.")}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white rounded-xl text-xs font-bold shadow-lg"
+                  onClick={() => copyToClipboard("https://cloudbot-saas.onrender.com/chat/", 'api_copy')}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
-                  Upgrade for $19 / month
+                  {copiedKey === 'api_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedKey === 'api_copy' ? "Copied API Endpoint!" : "Copy Endpoint URL"}
                 </button>
               </div>
             )}
