@@ -1,10 +1,11 @@
 import json
 import requests
+from fastapi import HTTPException
 from app.core.config import settings
 from app.db.vector_store import get_vector_store
 
 def _get_active_gemini_models(api_key: str) -> list:
-    """Google API Key से लाइव और वर्किंग मॉडल्स की लिस्ट सीधे फेच करता है"""
+    """Dynamically fetches active generateContent models supported by the API key."""
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
     try:
         resp = requests.get(list_url, timeout=10)
@@ -14,7 +15,6 @@ def _get_active_gemini_models(api_key: str) -> list:
                 m.get("name") for m in data.get("models", [])
                 if "generateContent" in m.get("supportedGenerationMethods", [])
             ]
-            # Flash मॉडल्स को प्राथमिकता दें
             flash_models = [m for m in models if "flash" in m.lower()]
             other_models = [m for m in models if "flash" not in m.lower()]
             return flash_models + other_models
@@ -41,7 +41,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
         ],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 1024
+            "maxOutputTokens": 1500
         }
     }
 
@@ -50,7 +50,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
         "contents": [{
             "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]
         }],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024}
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500}
     }
 
     last_error = ""
@@ -58,7 +58,6 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     for model_name in models_to_try:
         clean_model = model_name if model_name.startswith("models/") else f"models/{model_name}"
         
-        # v1beta और v1 दोनों एंडपॉइंट्स पर ऑटो-ट्रायल
         for api_version in ["v1beta", "v1"]:
             url = f"https://generativelanguage.googleapis.com/{api_version}/{clean_model}:generateContent?key={api_key}"
             
@@ -87,19 +86,21 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
 def generate_rag_response(bot_id: str, question: str) -> str:
-    """Retrieves context from vector store and generates a grounded answer."""
+    """Retrieves high-coverage context from vector store and generates an accurate, grounded answer."""
     try:
         vector_store = get_vector_store(bot_id)
-        retriever = vector_store.as_retriever(search_kwargs={"k": 6})
+        # Increased k to 8 for comprehensive coverage across long documents
+        retriever = vector_store.as_retriever(search_kwargs={"k": 8})
         docs = retriever.invoke(question)
 
         context = "\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
         system_instruction = (
-            "You are CloudBot, a helpful AI customer assistant. "
-            "Answer the user's question clearly, directly, and accurately using information from the context. "
-            "Do NOT include meta-talk, reasoning steps, or internal rules. Format points cleanly with bullet points (-). "
-            "If the answer cannot be found in the context, reply with: 'I do not have enough information from the provided content.'"
+            "You are CloudBot, an intelligent and helpful AI assistant. "
+            "Explain and answer the user's question clearly, thoroughly, and accurately using the provided context. "
+            "Do NOT include meta-talk, reasoning steps, or internal rules. Format bullet points and lists cleanly with (-). "
+            "If the context does not contain enough information to answer the question, reply with: "
+            "'I do not have enough information from the provided content.'"
         )
 
         user_content = f"Context:\n{context}\n\nUser Question:\n{question}\n\nAnswer directly:"
