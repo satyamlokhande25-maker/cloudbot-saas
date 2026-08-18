@@ -44,7 +44,6 @@ async def handle_whatsapp_message(bot_id: str, request: Request):
         if not from_number or not msg_body:
             return {"status": "ignored"}
 
-        # RAG Search
         ai_reply = generate_rag_response(bot_id=bot_id, question=msg_body)
 
         phone_number_id = value.get("metadata", {}).get("phone_number_id")
@@ -169,7 +168,7 @@ async def twilio_webhook(bot_id: str, request: Request):
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
-# 7. GENERIC REST API (Zapier / Make / CRM / Shopify / Custom Webhook)
+# 7. GENERIC REST API (Zapier / Make.com / CRM / Shopify / Custom Webhook)
 @router.post("/webhook/{bot_id}")
 async def custom_webhook(bot_id: str, request: Request):
     try:
