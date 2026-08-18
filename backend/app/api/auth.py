@@ -37,7 +37,7 @@ def login(user_data: UserLoginRequest, db: Session = Depends(get_db)):
     email = str(user_data.email).lower().strip()
     user = db.query(User).filter(User.email == email).first()
     
-    # Self-Healing: अगर Render रीस्टार्ट होने से यूज़र DB से हट गया हो, तो ऑटो-क्रिएट करके लॉगिन कराएं
+    
     if not user:
         hashed_pwd = hash_password(user_data.password)
         user = User(
@@ -51,7 +51,7 @@ def login(user_data: UserLoginRequest, db: Session = Depends(get_db)):
         token = create_access_token({"sub": email, "user_id": user.id})
         return TokenResponse(access_token=token, token_type="bearer", email=email)
 
-    # अगर यूज़र मौजूद है, तो पासवर्ड वेरीफ़ाई करें
+    
     if not verify_password(user_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

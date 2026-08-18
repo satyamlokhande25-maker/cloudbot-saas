@@ -8,7 +8,7 @@ from app.api.bots import router as bots_router
 from app.db.database import engine, Base
 from app.db import models
 
-# ऑटोमैटिक डेटाबेस टेबल्स तैयार करना
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -17,7 +17,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Vercel, Localhost और एक्सटर्नल क्लाइंट विजेट्स के लिए बुलेटप्रूफ CORS
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# सभी API राउटर्स शामिल करें
+
 app.include_router(auth_router)
 app.include_router(bots_router)
 app.include_router(train_router)
