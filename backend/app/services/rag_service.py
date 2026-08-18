@@ -32,12 +32,12 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     payload_system = {
         "system_instruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"role": "user", "parts": [{"text": user_content}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500}
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1500}
     }
 
     alt_payload = {
         "contents": [{"parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500}
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1500}
     }
 
     last_error = ""
@@ -73,30 +73,38 @@ def generate_rag_response(bot_id: str, question: str) -> str:
     """Retrieves top relevant context and generates a thorough, accurate answer."""
     try:
         vector_store = get_vector_store(bot_id)
+        
         # Search for top 6 chunks
-        retriever = vector_store.as_retriever(search_kwargs={"k": 6})
-        docs = retriever.invoke(question)
+        docs = []
+        try:
+            retriever = vector_store.as_retriever(search_kwargs={"k": 6})
+            docs = retriever.invoke(question)
+        except Exception:
+            docs = []
 
         context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
         system_instruction = (
-            "You are CloudBot, an intelligent and helpful AI assistant. "
-            "Explain and answer the user's question clearly, thoroughly, and accurately using the provided context.\n\n"
+            "You are CloudBot, an intelligent, helpful, and versatile AI assistant.\n\n"
             "Guidelines:\n"
-            "1. Answer based on the facts and information in the context.\n"
-            "2. Format points cleanly with bullet points (-) or concise paragraphs.\n"
-            "3. Do NOT include meta-talk, internal prompts, or reasoning steps.\n"
-            "4. Only if the provided context contains zero information to answer the question, state: "
-            "'I do not have enough information from the provided content.'"
+            "1. Primary Context: If the provided [CONTEXT] contains information relevant to the user query (e.g. details about the company, brand, website, or document), base your answer primarily on it.\n"
+            "2. General Knowledge: If the user asks general, technical (e.g., Python, programming, tech terms), or conceptual questions, answer them accurately and thoroughly using your full knowledge base.\n"
+            "3. Missing Specific Brand Details: If the user asks for specific private data or internal details that are completely missing from the context, answer using best relevant general knowledge and politely mention that specific internal records weren't found.\n"
+            "4. Formatting: Keep responses professional, clear, and well-structured using concise paragraphs and bullet points.\n"
+            "5. Do NOT refuse general questions or greetings by saying you lack context."
         )
 
-        user_content = f"### CONTEXT:\n{context}\n\n### QUESTION:\n{question}\n\n### ANSWER:"
+        user_content = (
+            f"[CONTEXT]:\n{context if context.strip() else 'No specific document context provided.'}\n\n"
+            f"User Question: {question}\n\n"
+            f"Answer:"
+        )
 
         response = _call_gemini_api(system_instruction, user_content)
         if response and response.strip():
             return response.strip()
 
-        return "I do not have enough information from the provided content."
+        return "I am here to help. Could you please rephrase or elaborate on your question?"
 
     except Exception as e:
         return f"Chat processing error: {str(e)}"
