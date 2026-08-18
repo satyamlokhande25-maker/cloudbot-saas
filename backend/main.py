@@ -8,6 +8,7 @@ from app.api.bots import router as bots_router
 from app.db.database import engine, Base
 from app.db import models
 
+# ऑटोमैटिक डेटाबेस टेबल्स तैयार करना
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -16,10 +17,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-
+# Vercel, Localhost और एक्सटर्नल क्लाइंट विजेट्स के लिए बुलेटप्रूफ CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,7 +34,7 @@ app.include_router(chat_router)
 
 @app.get("/")
 def root():
-    return {"message": "CloudBot API is Live"}
+    return {"message": "CloudBot API is Live and Healthy"}
 
 @app.get("/health", tags=["default"])
 def health_check():
