@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X, Smartphone, MessageCircle, ShoppingBag
+  Palette, Layers, X
 } from 'lucide-react';
 import { 
   registerUser, 
@@ -69,7 +69,7 @@ export default function App() {
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
   const [appearanceSaved, setAppearanceSaved] = useState(false);
 
-  // Integration Modals (9 Channels)
+  // Dynamic 9-Integrations Modals
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [tgToken, setTgToken] = useState('');
