@@ -6,8 +6,6 @@ sqlalchemy
 python-dotenv
 requests
 beautifulsoup4
-selenium
-webdriver-manager
 pypdf
 youtube-transcript-api
 yt-dlp
@@ -20,3 +18,4 @@ PyJWT
 bcrypt
 email-validator
 python-multipart
+google-generativeai
