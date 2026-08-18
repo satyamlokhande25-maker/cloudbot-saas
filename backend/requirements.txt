@@ -3,6 +3,7 @@ uvicorn
 pydantic
 pydantic-settings
 sqlalchemy
+psycopg2-binary
 python-dotenv
 requests
 beautifulsoup4
@@ -14,9 +15,10 @@ langchain-chroma
 langchain-core
 langchain-community
 langchain-text-splitters
+langchain-google-genai
+google-generativeai
+groq
 PyJWT
 bcrypt
 email-validator
 python-multipart
-groq
-google-generativeai
