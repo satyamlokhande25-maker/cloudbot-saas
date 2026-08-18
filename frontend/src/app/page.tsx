@@ -65,23 +65,45 @@ export default function App() {
   const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; created_at: string }>>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
 
-  // Appearance States
+  // Appearance States (With Persistent Storage)
   const [customThemeColor, setCustomThemeColor] = useState('#4f46e5');
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
   const [appearanceSaved, setAppearanceSaved] = useState(false);
 
+  // 1. Initial Authentication & Saved Settings Recovery
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
     if (savedToken) setToken(savedToken);
+
+    const savedTab = localStorage.getItem('dashboard_tab');
+    if (savedTab) setDashboardTab(savedTab as any);
   }, []);
+
+  // Sync active bot appearance with LocalStorage
+  useEffect(() => {
+    if (activeBot) {
+      const savedColor = localStorage.getItem(`bot_color_${activeBot.id}`);
+      const savedMsg = localStorage.getItem(`bot_msg_${activeBot.id}`);
+      if (savedColor) setCustomThemeColor(savedColor);
+      else if (activeBot.theme_color) setCustomThemeColor(activeBot.theme_color);
+
+      if (savedMsg) setWelcomeMessage(savedMsg);
+      localStorage.setItem('last_active_bot_id', activeBot.id);
+    }
+  }, [activeBot]);
 
   const loadBots = async () => {
     try {
       const userBots = await getUserBots();
       setBots(userBots);
-      if (userBots.length > 0 && !activeBot) {
+      const lastBotId = localStorage.getItem('last_active_bot_id');
+      const matched = userBots.find((b: BotItem) => b.id === lastBotId);
+
+      if (matched) {
+        setActiveBot(matched);
+      } else if (userBots.length > 0) {
         setActiveBot(userBots[0]);
-      } else if (userBots.length === 0) {
+      } else {
         const defaultBot = { id: 'test_bot_1', name: 'Default Assistant' };
         setActiveBot(defaultBot);
       }
@@ -108,6 +130,7 @@ export default function App() {
       });
       setBots((prev) => [...prev, created]);
       setActiveBot(created);
+      localStorage.setItem('last_active_bot_id', created.id);
       setShowCreateModal(false);
       setNewBotName('');
     } catch (err: any) {
@@ -159,6 +182,7 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('last_active_bot_id');
     setToken(null);
   };
 
@@ -218,6 +242,20 @@ export default function App() {
     navigator.clipboard.writeText(widgetSnippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSaveAppearance = () => {
+    if (activeBot) {
+      localStorage.setItem(`bot_color_${activeBot.id}`, customThemeColor);
+      localStorage.setItem(`bot_msg_${activeBot.id}`, welcomeMessage);
+    }
+    setAppearanceSaved(true);
+    setTimeout(() => setAppearanceSaved(false), 2000);
+  };
+
+  const handleTabChange = (tab: 'train' | 'logs' | 'appearance' | 'integrations') => {
+    setDashboardTab(tab);
+    localStorage.setItem('dashboard_tab', tab);
   };
 
   if (!token) {
@@ -338,11 +376,11 @@ export default function App() {
             </select>
           </div>
 
-          {/* Navigation Menu (FastBots Inspired) */}
+          {/* Navigation Menu */}
           <div className="space-y-1.5 mb-6">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Workspace</p>
             <button
-              onClick={() => setDashboardTab('train')}
+              onClick={() => handleTabChange('train')}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                 dashboardTab === 'train' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
@@ -350,7 +388,7 @@ export default function App() {
               <Sparkles className="w-4 h-4" /> Training & Playground
             </button>
             <button
-              onClick={() => setDashboardTab('appearance')}
+              onClick={() => handleTabChange('appearance')}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                 dashboardTab === 'appearance' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
@@ -358,7 +396,7 @@ export default function App() {
               <Palette className="w-4 h-4" /> Appearance & Theme
             </button>
             <button
-              onClick={() => setDashboardTab('integrations')}
+              onClick={() => handleTabChange('integrations')}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                 dashboardTab === 'integrations' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
@@ -366,7 +404,7 @@ export default function App() {
               <Layers className="w-4 h-4" /> Integrations
             </button>
             <button
-              onClick={() => setDashboardTab('logs')}
+              onClick={() => handleTabChange('logs')}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                 dashboardTab === 'logs' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
@@ -592,13 +630,13 @@ export default function App() {
                     <input 
                       type="color" 
                       value={customThemeColor} 
-                      onChange={(e) => setCustomThemeColor(e.target.value)}
+                      onChange={(e) => setCustomThemeColor(e.target.value)} 
                       className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
                     />
                     <input 
                       type="text" 
                       value={customThemeColor} 
-                      onChange={(e) => setCustomThemeColor(e.target.value)}
+                      onChange={(e) => setCustomThemeColor(e.target.value)} 
                       className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                     />
                   </div>
@@ -615,10 +653,7 @@ export default function App() {
                 </div>
 
                 <button 
-                  onClick={() => {
-                    setAppearanceSaved(true);
-                    setTimeout(() => setAppearanceSaved(false), 2000);
-                  }}
+                  onClick={handleSaveAppearance}
                   className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium transition flex items-center justify-center gap-2"
                 >
                   {appearanceSaved ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : 'Save Appearance'}
