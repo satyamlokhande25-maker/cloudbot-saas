@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Share2, Layers, MessageCircle, Sliders, ExternalLink
+  Palette, Share2, Layers, MessageCircle, Sliders, ExternalLink, X, HelpCircle, ArrowRight
 } from 'lucide-react';
 import { 
   registerUser, 
@@ -43,7 +43,7 @@ export default function App() {
   const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
-  // Navigation: FastBots Style Hub Tabs
+  // Navigation Tabs
   const [dashboardTab, setDashboardTab] = useState<'train' | 'logs' | 'appearance' | 'integrations'>('train');
   const [activeTab, setActiveTab] = useState<'website' | 'youtube' | 'pdf'>('website');
   
@@ -69,6 +69,12 @@ export default function App() {
   const [customThemeColor, setCustomThemeColor] = useState('#4f46e5');
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
   const [appearanceSaved, setAppearanceSaved] = useState(false);
+
+  // Integration Modal States
+  const [activeModal, setActiveModal] = useState<'whatsapp' | 'webhook' | 'telegram' | null>(null);
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const [telegramToken, setTelegramToken] = useState('');
+  const [tgConnected, setTgConnected] = useState(false);
 
   // 1. Initial Authentication & Saved Settings Recovery
   useEffect(() => {
@@ -233,8 +239,9 @@ export default function App() {
   };
 
   const widgetSnippet = `<script 
-  src="https://cloudbot-saas.onrender.com/widget.js" 
+  src="https://cloudbot-saas.vercel.app/widget.js" 
   data-bot-id="${activeBot?.id || 'test_bot_1'}" 
+  data-theme-color="${customThemeColor}"
   defer>
 </script>`;
 
@@ -344,7 +351,7 @@ export default function App() {
       <aside className="w-full md:w-72 bg-slate-900 border-r border-slate-800 p-6 flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-indigo-600 rounded-lg">
+            <div style={{ backgroundColor: customThemeColor }} className="p-2 rounded-lg transition-colors">
               <Bot className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-xl font-bold tracking-tight">CloudBot AI</h1>
@@ -444,9 +451,9 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full">
+        {/* Tab 1: Training & Playground */}
         {dashboardTab === 'train' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Column: Data Ingestion */}
             <div className="lg:col-span-6 space-y-6">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
                 <div className="flex items-center justify-between mb-2">
@@ -533,7 +540,8 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={trainStatus?.type === 'loading'}
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-xl text-sm transition flex items-center justify-center gap-2"
+                    style={{ backgroundColor: customThemeColor }}
+                    className="w-full py-2.5 hover:opacity-90 disabled:opacity-50 text-white font-medium rounded-xl text-sm transition flex items-center justify-center gap-2"
                   >
                     {trainStatus?.type === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
                     Ingest & Index Knowledge
@@ -572,9 +580,10 @@ export default function App() {
                       className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
+                        style={m.role === 'user' ? { backgroundColor: customThemeColor } : {}}
                         className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
                           m.role === 'user'
-                            ? 'bg-indigo-600 text-white rounded-br-none'
+                            ? 'text-white rounded-br-none'
                             : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
                         }`}
                       >
@@ -604,7 +613,8 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={isChatLoading || !inputQuery.trim()}
-                    className="p-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition"
+                    style={{ backgroundColor: customThemeColor }}
+                    className="p-2.5 hover:opacity-90 disabled:opacity-50 text-white rounded-xl transition"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -654,7 +664,8 @@ export default function App() {
 
                 <button 
                   onClick={handleSaveAppearance}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium transition flex items-center justify-center gap-2"
+                  style={{ backgroundColor: customThemeColor }}
+                  className="w-full py-2.5 hover:opacity-90 text-white rounded-xl text-xs font-medium transition flex items-center justify-center gap-2"
                 >
                   {appearanceSaved ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : 'Save Appearance'}
                 </button>
@@ -664,7 +675,7 @@ export default function App() {
             <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center">
               <p className="text-xs text-slate-400 mb-4 font-semibold">Live Widget Preview</p>
               <div className="w-72 bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-2xl">
-                <div style={{ backgroundColor: customThemeColor }} className="p-3 rounded-xl text-white font-bold text-xs flex items-center justify-between mb-4">
+                <div style={{ backgroundColor: customThemeColor }} className="p-3 rounded-xl text-white font-bold text-xs flex items-center justify-between mb-4 transition-colors">
                   <span>{activeBot?.name || 'Assistant'}</span>
                   <span className="w-2 h-2 bg-emerald-400 rounded-full" />
                 </div>
@@ -679,14 +690,19 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Integrations Hub (FastBots Style) */}
+        {/* Tab 3: Native Integrations Hub */}
         {dashboardTab === 'integrations' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="mb-6 pb-4 border-b border-slate-800">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-400" /> Native Integrations
-              </h2>
-              <p className="text-xs text-slate-400">Connect your trained bot directly to external channels and apps.</p>
+            <div className="mb-6 pb-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-400" /> Native Integrations
+                </h2>
+                <p className="text-xs text-slate-400">Connect your trained bot directly to external channels and apps.</p>
+              </div>
+              <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 px-3 py-1.5 rounded-lg font-mono">
+                Active Bot: {activeBot?.id || 'test_bot_1'}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -700,8 +716,11 @@ export default function App() {
                   <h3 className="font-bold text-sm text-white mb-1">WhatsApp Business</h3>
                   <p className="text-xs text-slate-400 mb-4">Connect your bot with WhatsApp Cloud API to automate 24/7 client messages.</p>
                 </div>
-                <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
-                  Configure
+                <button 
+                  onClick={() => setActiveModal('whatsapp')}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition"
+                >
+                  Configure WhatsApp
                 </button>
               </div>
 
@@ -715,8 +734,13 @@ export default function App() {
                   <h3 className="font-bold text-sm text-white mb-1">WordPress / Web Embed</h3>
                   <p className="text-xs text-slate-400 mb-4">One-line script integration for any WordPress, Webflow, or Shopify site.</p>
                 </div>
-                <button onClick={copyWidgetCode} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition">
-                  Copy Script Code
+                <button 
+                  onClick={copyWidgetCode} 
+                  style={{ backgroundColor: customThemeColor }}
+                  className="w-full py-2 hover:opacity-90 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5"
+                >
+                  {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied Script!' : 'Copy Script Code'}
                 </button>
               </div>
 
@@ -728,9 +752,12 @@ export default function App() {
                     <span className="text-[10px] bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-semibold">Ready</span>
                   </div>
                   <h3 className="font-bold text-sm text-white mb-1">Zapier / Webhooks</h3>
-                  <p className="text-xs text-slate-400 mb-4">Send chat leads and logs straight into Google Sheets or your CRM.</p>
+                  <p className="text-xs text-slate-400 mb-4">Send chat leads and logs straight into Google Sheets or your CRM via REST API.</p>
                 </div>
-                <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
+                <button 
+                  onClick={() => setActiveModal('webhook')}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition"
+                >
                   Manage Webhook
                 </button>
               </div>
@@ -750,7 +777,8 @@ export default function App() {
               </div>
               <button 
                 onClick={fetchLogs} 
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium"
+                style={{ backgroundColor: customThemeColor }}
+                className="px-3 py-1.5 hover:opacity-90 text-white rounded-lg text-xs font-medium"
               >
                 Refresh Logs
               </button>
@@ -780,6 +808,83 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Integration Setup Modal */}
+      {activeModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg text-white shadow-2xl relative">
+            <button 
+              onClick={() => setActiveModal(null)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {activeModal === 'whatsapp' && (
+              <div>
+                <h3 className="text-base font-bold mb-2 flex items-center gap-2">
+                  <span>🟢</span> WhatsApp Cloud API Setup
+                </h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  Connect your Meta WhatsApp Business number using your CloudBot webhook URL.
+                </p>
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-2 mb-4">
+                  <div className="text-[11px] text-slate-400">Callback Webhook URL:</div>
+                  <div className="font-mono text-emerald-400 text-[11px] break-all">
+                    https://cloudbot-saas.onrender.com/integrations/telegram/{activeBot?.id || 'test_bot_1'}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  1. Go to developers.facebook.com ➔ WhatsApp ➔ Configuration.<br/>
+                  2. Paste this Webhook Callback URL and subscribe to <code>messages</code>.<br/>
+                  3. Your bot will automatically reply to incoming customer messages!
+                </p>
+                <button 
+                  onClick={() => setActiveModal(null)}
+                  className="mt-6 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+
+            {activeModal === 'webhook' && (
+              <div>
+                <h3 className="text-base font-bold mb-2 flex items-center gap-2">
+                  <span>⚡</span> REST API & Webhook Configuration
+                </h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  Connect your bot with Zapier, Make.com, or any custom CRM using this POST endpoint.
+                </p>
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-2 mb-4">
+                  <div className="text-[11px] text-slate-400">Webhook POST URL:</div>
+                  <div className="font-mono text-indigo-300 text-[11px] break-all">
+                    https://cloudbot-saas.onrender.com/chat/
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-2">Payload (JSON):</div>
+                  <pre className="text-[10px] text-amber-300 font-mono bg-slate-900 p-2 rounded">
+{`{
+  "bot_id": "${activeBot?.id || 'test_bot_1'}",
+  "question": "User question here"
+}`}
+                  </pre>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("https://cloudbot-saas.onrender.com/chat/");
+                    setWebhookCopied(true);
+                    setTimeout(() => setWebhookCopied(false), 2000);
+                  }}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                >
+                  {webhookCopied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {webhookCopied ? "Copied Endpoint!" : "Copy Webhook URL"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Create New Bot Modal */}
       {showCreateModal && (
