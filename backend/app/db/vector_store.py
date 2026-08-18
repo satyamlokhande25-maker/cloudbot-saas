@@ -1,73 +1,55 @@
 import os
-import time
+import requests
 from typing import List
-import google.generativeai as genai
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 from app.core.config import settings
 
-api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
-if api_key:
-    genai.configure(api_key=api_key)
+class DirectGoogleRESTEmbeddings(Embeddings):
+    """Direct REST API Embeddings for text-embedding-004 (Zero SDK Dependencies)."""
 
-class ReliableGoogleEmbeddings(Embeddings):
-    """Reliable Google text-embedding-004 wrapper with zero-vector fallback prevention."""
     def __init__(self):
-        self.model = "models/text-embedding-004"
+        self.api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
+        self.url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={self.api_key}"
+
+    def _get_embedding(self, text: str) -> List[float]:
+        clean_text = str(text)[:2000].strip() if text else " "
+        if not self.api_key:
+            return [0.0] * 768
+
+        payload = {
+            "model": "models/text-embedding-004",
+            "content": {
+                "parts": [{"text": clean_text}]
+            }
+        }
+        headers = {"Content-Type": "application/json"}
+
+        try:
+            resp = requests.post(self.url, headers=headers, json=payload, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                values = data.get("embedding", {}).get("values", [])
+                if values and len(values) > 0:
+                    return values
+        except Exception:
+            pass
+
+        return [0.0] * 768
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         if not texts:
             return []
-        
-        all_embeddings = []
-        # Process in safe batches of 15
-        batch_size = 15
-        for i in range(0, len(texts), batch_size):
-            batch = [t[:1500] if t else " " for t in texts[i:i + batch_size]]
-            try:
-                res = genai.embed_content(
-                    model=self.model,
-                    content=batch,
-                    task_type="retrieval_document"
-                )
-                embeddings = res.get("embedding", [])
-                if embeddings and isinstance(embeddings[0], list):
-                    all_embeddings.extend(embeddings)
-                else:
-                    for single_text in batch:
-                        r = genai.embed_content(model=self.model, content=single_text, task_type="retrieval_document")
-                        all_embeddings.append(r.get("embedding", [0.0] * 768))
-            except Exception:
-                for single_text in batch:
-                    try:
-                        r = genai.embed_content(model=self.model, content=single_text, task_type="retrieval_document")
-                        all_embeddings.append(r.get("embedding", [0.0] * 768))
-                    except Exception:
-                        all_embeddings.append([0.0] * 768)
-            time.sleep(0.05)
-
-        return all_embeddings
+        embeddings_list = []
+        for t in texts:
+            emb = self._get_embedding(t)
+            embeddings_list.append(emb)
+        return embeddings_list
 
     def embed_query(self, text: str) -> List[float]:
-        clean_text = text[:1500] if text else " "
-        try:
-            res = genai.embed_content(
-                model=self.model,
-                content=clean_text,
-                task_type="retrieval_query"
-            )
-            return res.get("embedding", [])
-        except Exception:
-            try:
-                res = genai.embed_content(
-                    model="text-embedding-004",
-                    content=clean_text
-                )
-                return res.get("embedding", [])
-            except Exception:
-                return [0.0] * 768
+        return self._get_embedding(text)
 
-embeddings = ReliableGoogleEmbeddings()
+embeddings = DirectGoogleRESTEmbeddings()
 
 def get_vector_store(bot_id: str) -> Chroma:
     """Returns an isolated ChromaDB vector store instance for a specific bot."""
