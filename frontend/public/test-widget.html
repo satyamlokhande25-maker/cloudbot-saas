@@ -27,6 +27,129 @@
     }
     h1 { color: #818cf8; margin-bottom: 12px; font-size: 26px; }
     p { color: #9ca3af; font-size: 14px; line-height: 1.6; }
+    .bot-badge {
+      display: inline-block;
+      background: #312e81;
+      color: #c7d2fe;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      margin-top: 10px;
+    }
+
+    /* Embedded Floating Widget Styles */
+    #cloudbot-widget-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999999;
+    }
+    #cloudbot-toggle-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, background 0.2s;
+    }
+    #cloudbot-toggle-btn:hover { transform: scale(1.05); background: #4338ca; }
+    #cloudbot-chat-window {
+      display: none;
+      flex-direction: column;
+      width: 360px;
+      height: 500px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    #cloudbot-header {
+      background: #1e293b;
+      color: white;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 1px solid #334155;
+    }
+    #cloudbot-close-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #cloudbot-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cb-msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .cb-user {
+      background: #4f46e5;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+    .cb-bot {
+      background: #1e293b;
+      color: #e2e8f0;
+      align-self: flex-start;
+      border-bottom-left-radius: 2px;
+      border: 1px solid #334155;
+    }
+    #cloudbot-input-container {
+      display: flex;
+      padding: 12px;
+      background: #1e293b;
+      border-top: 1px solid #334155;
+      gap: 8px;
+    }
+    #cloudbot-input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    #cloudbot-input:focus { border-color: #6366f1; }
+    #cloudbot-send-btn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #cloudbot-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -34,14 +157,98 @@
   <div class="card">
     <h1>🚀 My Awesome Business Website</h1>
     <p>This is a mock customer website demonstrating the CloudBot AI Embeddable Floating Chat Widget.</p>
-    <p>Look at the <strong>bottom-right corner</strong> to test the chat widget live!</p>
+    <div class="bot-badge">Connected Bot: bot_6d716159</div>
+    <p style="margin-top: 14px;">Look at the <strong>bottom-right corner</strong> to test the chat widget live!</p>
   </div>
 
-  <!-- Live Embed Widget Script with Cache-Buster & Active Bot ID -->
-  <script 
-    src="https://cloudbot-saas.vercel.app/widget.js?v=999" 
-    data-bot-id="bot_6d716159" 
-    defer>
+  <!-- Inlined Floating Widget Structure -->
+  <div id="cloudbot-widget-container">
+    <div id="cloudbot-chat-window">
+      <div id="cloudbot-header">
+        <span>CloudBot Support</span>
+        <button id="cloudbot-close-btn">&times;</button>
+      </div>
+      <div id="cloudbot-messages">
+        <div class="cb-msg cb-bot">Hello! How can I assist you today?</div>
+      </div>
+      <div id="cloudbot-input-container">
+        <input type="text" id="cloudbot-input" placeholder="Ask a question..." />
+        <button id="cloudbot-send-btn">Send</button>
+      </div>
+    </div>
+    <button id="cloudbot-toggle-btn" aria-label="Open Chat">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Direct Native Widget Logic -->
+  <script>
+    (function () {
+      const BACKEND_API_URL = "https://cloudbot-saas.onrender.com";
+      const BOT_ID = "bot_6d716159";
+
+      const toggleBtn = document.getElementById('cloudbot-toggle-btn');
+      const closeBtn = document.getElementById('cloudbot-close-btn');
+      const chatWindow = document.getElementById('cloudbot-chat-window');
+      const messagesContainer = document.getElementById('cloudbot-messages');
+      const input = document.getElementById('cloudbot-input');
+      const sendBtn = document.getElementById('cloudbot-send-btn');
+
+      toggleBtn.onclick = function () {
+        const isVisible = chatWindow.style.display === 'flex';
+        chatWindow.style.display = isVisible ? 'none' : 'flex';
+        if (!isVisible) input.focus();
+      };
+      closeBtn.onclick = function () { chatWindow.style.display = 'none'; };
+
+      async function sendMessage() {
+        const question = input.value.trim();
+        if (!question) return;
+
+        // User message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'cb-msg cb-user';
+        userDiv.textContent = question;
+        messagesContainer.appendChild(userDiv);
+        input.value = '';
+        sendBtn.disabled = true;
+
+        // Loading state
+        const botLoading = document.createElement('div');
+        botLoading.className = 'cb-msg cb-bot';
+        botLoading.textContent = 'Thinking...';
+        messagesContainer.appendChild(botLoading);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        try {
+          const response = await fetch(`${BACKEND_API_URL}/chat/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bot_id: BOT_ID, question: question })
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok) {
+            botLoading.textContent = (data && data.detail) || `Server status: ${response.status}`;
+          } else {
+            botLoading.textContent = (data && data.answer) || "I do not have enough information from the provided content.";
+          }
+        } catch (err) {
+          botLoading.textContent = "Server is waking up (Render Free Tier). Please ask again in 5 seconds.";
+        } finally {
+          sendBtn.disabled = false;
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      }
+
+      sendBtn.onclick = sendMessage;
+      input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') sendMessage();
+      });
+    })();
   </script>
 
 </body>
