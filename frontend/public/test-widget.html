@@ -2,18 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CloudBot Widget Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Portal - Live Widget Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0b0f19;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background-color: #111827;
+      padding: 40px;
+      border-radius: 20px;
+      border: 1px solid #1f2937;
+      text-align: center;
+      max-width: 520px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+    h1 { color: #818cf8; margin-bottom: 12px; font-size: 26px; }
+    p { color: #9ca3af; font-size: 14px; line-height: 1.6; }
+  </style>
 </head>
-<body style="background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
-  <div style="text-align: center; padding: 30px; background: #1e293b; border-radius: 12px;">
-    <h2>🚀 Live Widget Testing</h2>
-    <p>Look at the bottom right corner to test the chat widget.</p>
+<body>
+
+  <div class="card">
+    <h1>🚀 My Awesome Business Website</h1>
+    <p>This is a mock customer website demonstrating the CloudBot AI Embeddable Floating Chat Widget.</p>
+    <p>Look at the <strong>bottom-right corner</strong> to test the chat widget live!</p>
   </div>
 
-  <!-- Bot ID: Replace with your exact active bot ID -->
+  <!-- Live Embed Widget Script with Cache-Buster & Active Bot ID -->
   <script 
-    src="https://cloudbot-saas.vercel.app/widget.js?v=2" 
-    data-bot-id="bot_468e10f2" 
+    src="https://cloudbot-saas.vercel.app/widget.js?v=999" 
+    data-bot-id="bot_6d716159" 
     defer>
   </script>
+
 </body>
+</html>
