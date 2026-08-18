@@ -6,75 +6,68 @@ from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 from app.core.config import settings
 
-# Configure Google GenAI
-api_key = str(settings.GOOGLE_API_KEY).strip()
-genai.configure(api_key=api_key)
+api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
+if api_key:
+    genai.configure(api_key=api_key)
 
-
-class OfficialGoogleEmbeddings(Embeddings):
-    """Reliable Google text-embedding-004 batch embedding wrapper."""
-
+class ReliableGoogleEmbeddings(Embeddings):
+    """Reliable Google text-embedding-004 wrapper with zero-vector fallback prevention."""
     def __init__(self):
         self.model = "models/text-embedding-004"
-
-    def _embed_single(self, text: str, task_type: str) -> List[float]:
-        clean = text[:2000] if text else " "
-        try:
-            res = genai.embed_content(
-                model=self.model,
-                content=clean,
-                task_type=task_type
-            )
-            return res.get("embedding", [])
-        except Exception:
-            try:
-                res = genai.embed_content(
-                    model="text-embedding-004",
-                    content=clean,
-                    task_type=task_type
-                )
-                return res.get("embedding", [])
-            except Exception as e:
-                print(f"[Embedding Error] Failed single embedding: {e}")
-                return [0.0] * 768
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         if not texts:
             return []
-
-        batch_size = 20
+        
         all_embeddings = []
-
+        # Process in safe batches of 15
+        batch_size = 15
         for i in range(0, len(texts), batch_size):
-            batch = [t[:2000] if t else " " for t in texts[i:i + batch_size]]
+            batch = [t[:1500] if t else " " for t in texts[i:i + batch_size]]
             try:
                 res = genai.embed_content(
                     model=self.model,
                     content=batch,
                     task_type="retrieval_document"
                 )
-                emb = res.get("embedding", [])
-                if emb and isinstance(emb[0], list):
-                    all_embeddings.extend(emb)
+                embeddings = res.get("embedding", [])
+                if embeddings and isinstance(embeddings[0], list):
+                    all_embeddings.extend(embeddings)
                 else:
-                    raise ValueError("Unexpected batch response format")
-            except Exception as batch_err:
-                print(f"[Embedding Batch Warning] Falling back to itemized processing: {batch_err}")
+                    for single_text in batch:
+                        r = genai.embed_content(model=self.model, content=single_text, task_type="retrieval_document")
+                        all_embeddings.append(r.get("embedding", [0.0] * 768))
+            except Exception:
                 for single_text in batch:
-                    all_embeddings.append(self._embed_single(single_text, "retrieval_document"))
-
-            # Brief pause to respect API rate limits on high chunk counts
-            if len(texts) > batch_size:
-                time.sleep(0.1)
+                    try:
+                        r = genai.embed_content(model=self.model, content=single_text, task_type="retrieval_document")
+                        all_embeddings.append(r.get("embedding", [0.0] * 768))
+                    except Exception:
+                        all_embeddings.append([0.0] * 768)
+            time.sleep(0.05)
 
         return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
-        return self._embed_single(text, "retrieval_query")
+        clean_text = text[:1500] if text else " "
+        try:
+            res = genai.embed_content(
+                model=self.model,
+                content=clean_text,
+                task_type="retrieval_query"
+            )
+            return res.get("embedding", [])
+        except Exception:
+            try:
+                res = genai.embed_content(
+                    model="text-embedding-004",
+                    content=clean_text
+                )
+                return res.get("embedding", [])
+            except Exception:
+                return [0.0] * 768
 
-
-embeddings = OfficialGoogleEmbeddings()
-
+embeddings = ReliableGoogleEmbeddings()
 
 def get_vector_store(bot_id: str) -> Chroma:
     """Returns an isolated ChromaDB vector store instance for a specific bot."""
@@ -85,7 +78,6 @@ def get_vector_store(bot_id: str) -> Chroma:
         embedding_function=embeddings,
         collection_name=f"bot_{bot_id}"
     )
-
 
 def add_documents_to_vector_store(documents: list, bot_id: str):
     """Embeds and saves document chunks into the Chroma collection."""

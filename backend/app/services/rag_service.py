@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.db.vector_store import get_vector_store
 
 def _get_active_gemini_models(api_key: str) -> list:
-    """Fetches active generateContent models dynamically."""
+    """Dynamically fetches active models."""
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
     try:
         resp = requests.get(list_url, timeout=10)
@@ -19,7 +19,6 @@ def _get_active_gemini_models(api_key: str) -> list:
             return flash_models + other_models
     except Exception:
         pass
-    
     return ["models/gemini-1.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-pro"]
 
 def _call_gemini_api(system_instruction: str, user_content: str) -> str:
@@ -31,33 +30,21 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     headers = {"Content-Type": "application/json"}
     
     payload_system = {
-        "system_instruction": {
-            "parts": [{"text": system_instruction}]
-        },
-        "contents": [
-            {"role": "user", "parts": [{"text": user_content}]}
-        ],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 1500
-        }
+        "system_instruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"role": "user", "parts": [{"text": user_content}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500}
     }
 
     alt_payload = {
-        "contents": [{
-            "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]
-        }],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1500}
+        "contents": [{"parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500}
     }
 
     last_error = ""
-
     for model_name in models_to_try:
         clean_model = model_name if model_name.startswith("models/") else f"models/{model_name}"
-        
         for api_version in ["v1beta", "v1"]:
             url = f"https://generativelanguage.googleapis.com/{api_version}/{clean_model}:generateContent?key={api_key}"
-            
             try:
                 resp = requests.post(url, headers=headers, json=payload_system, timeout=25)
                 if resp.status_code != 200:
@@ -86,28 +73,24 @@ def generate_rag_response(bot_id: str, question: str) -> str:
     """Retrieves top relevant context and generates a thorough, accurate answer."""
     try:
         vector_store = get_vector_store(bot_id)
-        # Retrieves top 8 chunks to cover deep sections
-        retriever = vector_store.as_retriever(search_kwargs={"k": 8})
+        # Search for top 6 chunks
+        retriever = vector_store.as_retriever(search_kwargs={"k": 6})
         docs = retriever.invoke(question)
 
         context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
         system_instruction = (
             "You are CloudBot, an intelligent and helpful AI assistant. "
-            "Your objective is to answer the user's question accurately and comprehensively using the provided context.\n\n"
+            "Explain and answer the user's question clearly, thoroughly, and accurately using the provided context.\n\n"
             "Guidelines:\n"
-            "1. Synthesize facts, definitions, and explanations directly from the context.\n"
-            "2. Present the answer clearly with descriptive paragraphs and clean bullet points (-).\n"
-            "3. Do NOT include meta-commentary, prompt rules, or reasoning steps.\n"
-            "4. Only if the provided context contains zero relevant facts about the topic, state: "
+            "1. Answer based on the facts and information in the context.\n"
+            "2. Format points cleanly with bullet points (-) or concise paragraphs.\n"
+            "3. Do NOT include meta-talk, internal prompts, or reasoning steps.\n"
+            "4. Only if the provided context contains zero information to answer the question, state: "
             "'I do not have enough information from the provided content.'"
         )
 
-        user_content = (
-            f"### CONTEXT INFORMATION:\n{context}\n\n"
-            f"### USER QUESTION:\n{question}\n\n"
-            f"### FINAL ANSWER (Clear, grounded, and structured):"
-        )
+        user_content = f"### CONTEXT:\n{context}\n\n### QUESTION:\n{question}\n\n### ANSWER:"
 
         response = _call_gemini_api(system_instruction, user_content)
         if response and response.strip():
