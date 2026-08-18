@@ -18,4 +18,5 @@ PyJWT
 bcrypt
 email-validator
 python-multipart
+groq
 google-generativeai
