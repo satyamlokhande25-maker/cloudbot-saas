@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-
+// प्रोडक्शन और लोकल के लिए लाइव बैकएंड URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cloudbot-saas.onrender.com';
 
 export const apiClient = axios.create({
@@ -10,7 +10,7 @@ export const apiClient = axios.create({
   },
 });
 
-
+// हर रिक्वेस्ट के साथ ऑटोमैटिक JWT टोकन अटैच करना
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
@@ -52,7 +52,7 @@ export const trainPdf = async (botId: string, file: File) => {
   return res.data;
 };
 
-// 3. Chat APIs
+// 3. Chat & History APIs
 export const askBot = async (botId: string, question: string) => {
   const res = await apiClient.post('/chat/', { bot_id: botId, question });
   return res.data;
@@ -63,7 +63,7 @@ export const getChatHistory = async (botId: string) => {
   return res.data;
 };
 
-// 4. Bot Management APIs
+// 4. Bot Management APIs (No invalid keyword args)
 export const createNewBot = async (data: {
   name: string;
   system_prompt?: string;
