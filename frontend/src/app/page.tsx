@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout
+  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout, UserCheck, Phone, DownloadCloud
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -16,7 +16,8 @@ import {
   askBot, 
   getChatHistory, 
   getUserBots, 
-  createNewBot 
+  createNewBot,
+  getBotLeads 
 } from '@/lib/api';
 
 interface BotItem {
@@ -25,6 +26,14 @@ interface BotItem {
   system_prompt?: string;
   temperature?: number;
   theme_color?: string;
+}
+
+interface LeadItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  created_at: string;
 }
 
 export default function App() {
@@ -44,8 +53,8 @@ export default function App() {
   const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
-  // Navigation Tabs: 'train' | 'appearance' | 'deploy' | 'integrations' | 'logs'
-  const [dashboardTab, setDashboardTab] = useState<'train' | 'appearance' | 'deploy' | 'integrations' | 'logs'>('train');
+  // Navigation Tabs: 'train' | 'appearance' | 'deploy' | 'leads' | 'integrations' | 'logs'
+  const [dashboardTab, setDashboardTab] = useState<'train' | 'appearance' | 'deploy' | 'leads' | 'integrations' | 'logs'>('train');
   const [activeTab, setActiveTab] = useState<'website' | 'youtube' | 'pdf'>('website');
   
   // Ingestion States
@@ -62,8 +71,12 @@ export default function App() {
   const [isChatLoading, setIsChatLoading] = useState(false);
 
   // Chat Logs State
-  const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; created_at: string }>>([]);
+  const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; feedback?: string; created_at: string }>>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
+
+  // Leads State
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [isLeadsLoading, setIsLeadsLoading] = useState(false);
 
   // Appearance States
   const [customThemeColor, setCustomThemeColor] = useState('#4f46e5');
@@ -163,9 +176,25 @@ export default function App() {
     }
   };
 
+  const fetchLeads = async () => {
+    if (!activeBot) return;
+    setIsLeadsLoading(true);
+    try {
+      const data = await getBotLeads(activeBot.id);
+      setLeads(data);
+    } catch (e) {
+      console.error('Error fetching leads:', e);
+    } finally {
+      setIsLeadsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (token && dashboardTab === 'logs' && activeBot) {
       fetchLogs();
+    }
+    if (token && dashboardTab === 'leads' && activeBot) {
+      fetchLeads();
     }
   }, [dashboardTab, token, activeBot]);
 
@@ -257,7 +286,7 @@ export default function App() {
     setTimeout(() => setAppearanceSaved(false), 2000);
   };
 
-  const handleTabChange = (tab: 'train' | 'appearance' | 'deploy' | 'integrations' | 'logs') => {
+  const handleTabChange = (tab: 'train' | 'appearance' | 'deploy' | 'leads' | 'integrations' | 'logs') => {
     setDashboardTab(tab);
     localStorage.setItem('dashboard_tab', tab);
   };
@@ -280,6 +309,20 @@ export default function App() {
       downloadLink.click();
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+  };
+
+  const downloadLeadsCSV = () => {
+    if (leads.length === 0) return;
+    const headers = "ID,Name,Email,Phone,Created At\n";
+    const rows = leads.map(l => `"${l.id}","${l.name}","${l.email}","${l.phone}","${l.created_at}"`).join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${currentBotId}_leads.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (!token) {
@@ -426,6 +469,14 @@ export default function App() {
               }`}
             >
               <Share2 className="w-4 h-4" /> Deploy Hub (QR & Page)
+            </button>
+            <button
+              onClick={() => handleTabChange('leads')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'leads' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" /> Captured Leads
             </button>
             <button
               onClick={() => handleTabChange('integrations')}
@@ -858,7 +909,71 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 4: Integrations (9 Channels) */}
+        {/* Tab 4: Captured Leads */}
+        {dashboardTab === 'leads' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-indigo-400" /> Captured Visitor Leads
+                </h2>
+                <p className="text-xs text-slate-400">Contacts captured through {activeBot?.name || 'this bot'}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={downloadLeadsCSV}
+                  disabled={leads.length === 0}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" /> Export CSV
+                </button>
+                <button 
+                  onClick={fetchLeads} 
+                  style={{ backgroundColor: customThemeColor }}
+                  className="px-3.5 py-1.5 hover:opacity-90 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  Refresh Leads
+                </button>
+              </div>
+            </div>
+
+            {isLeadsLoading ? (
+              <div className="p-8 text-center text-slate-400 text-xs flex justify-center items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading visitor leads...
+              </div>
+            ) : leads.length === 0 ? (
+              <div className="p-12 text-center text-slate-500 text-xs flex flex-col items-center gap-2">
+                <UserCheck className="w-8 h-8 opacity-40" />
+                <span>No visitor leads captured yet. New contacts from the Support Page will appear here automatically.</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-slate-800 rounded-xl overflow-hidden">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Phone</th>
+                      <th className="px-4 py-3">Captured Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 bg-slate-900/50">
+                    {leads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-slate-800/50 transition">
+                        <td className="px-4 py-3 font-semibold text-white">{lead.name}</td>
+                        <td className="px-4 py-3 text-indigo-300 font-mono">{lead.email}</td>
+                        <td className="px-4 py-3 text-slate-400">{lead.phone}</td>
+                        <td className="px-4 py-3 text-slate-500">{lead.created_at}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 5: Integrations (9 Channels) */}
         {dashboardTab === 'integrations' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -874,7 +989,6 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              
               {/* WhatsApp */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
@@ -1039,12 +1153,11 @@ export default function App() {
                   Upgrade to Unlock
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* Tab 5: Logs */}
+        {/* Tab 6: Logs */}
         {dashboardTab === 'logs' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
@@ -1057,7 +1170,7 @@ export default function App() {
               <button 
                 onClick={fetchLogs} 
                 style={{ backgroundColor: customThemeColor }}
-                className="px-3 py-1.5 hover:opacity-90 text-white rounded-lg text-xs font-medium"
+                className="px-3.5 py-1.5 hover:opacity-90 text-white rounded-lg text-xs font-semibold transition"
               >
                 Refresh Logs
               </button>
@@ -1077,7 +1190,14 @@ export default function App() {
                       <span className={log.sender === 'user' ? 'text-indigo-400' : 'text-emerald-400'}>
                         {log.sender.toUpperCase()}
                       </span>
-                      <span className="text-slate-500">{log.created_at}</span>
+                      <div className="flex items-center gap-2 text-slate-500">
+                        {log.feedback && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${log.feedback === 'up' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
+                            {log.feedback === 'up' ? '👍 Helpful' : '👎 Unhelpful'}
+                          </span>
+                        )}
+                        <span>{log.created_at}</span>
+                      </div>
                     </div>
                     <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{log.message}</p>
                   </div>
