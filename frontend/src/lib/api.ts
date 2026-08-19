@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// प्रोडक्शन और लोकल के लिए लाइव बैकएंड URL
+// प्रोडक्शन और लोकल दोनों के लिए लाइव बैकएंड URL फ़ॉलबैक
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cloudbot-saas.onrender.com';
 
 export const apiClient = axios.create({
@@ -63,11 +63,23 @@ export const getChatHistory = async (botId: string) => {
   return res.data;
 };
 
-// 4. Bot Management APIs (No invalid keyword args)
+// 4. Lead Generation & Feedback APIs
+export const getBotLeads = async (botId: string) => {
+  const res = await apiClient.get(`/chat/leads/${botId}`);
+  return res.data;
+};
+
+export const submitFeedback = async (messageId: string, feedback: 'up' | 'down') => {
+  const res = await apiClient.post('/chat/feedback', { message_id: messageId, feedback });
+  return res.data;
+};
+
+// 5. Bot Management APIs
 export const createNewBot = async (data: {
   name: string;
   system_prompt?: string;
   temperature?: number;
+  theme_color?: string;
 }) => {
   const res = await apiClient.post('/bots/', data);
   return res.data;
