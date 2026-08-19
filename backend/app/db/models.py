@@ -9,11 +9,12 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    message_count = Column(Integer, default=0)  # 🔹 Free tier usage counter
-    message_limit = Column(Integer, default=50) # 🔹 Free limit (50 messages)
+    message_count = Column(Integer, default=0)  # Free tier usage counter
+    message_limit = Column(Integer, default=50) # Free limit (50 messages)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     bots = relationship("Bot", back_populates="owner")
+
 
 class Bot(Base):
     __tablename__ = "bots"
@@ -28,6 +29,8 @@ class Bot(Base):
 
     owner = relationship("User", back_populates="bots")
     chat_logs = relationship("ChatMessage", back_populates="bot")
+    leads = relationship("Lead", back_populates="bot")
+
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -36,6 +39,20 @@ class ChatMessage(Base):
     bot_id = Column(String, ForeignKey("bots.id"), nullable=False)
     sender = Column(String, nullable=False)  # 'user' or 'bot'
     message = Column(Text, nullable=False)
+    feedback = Column(String, nullable=True)  # 'up' | 'down' | None
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     bot = relationship("Bot", back_populates="chat_logs")
+
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id = Column(String, primary_key=True, index=True)
+    bot_id = Column(String, ForeignKey("bots.id"), nullable=False)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    bot = relationship("Bot", back_populates="leads")
