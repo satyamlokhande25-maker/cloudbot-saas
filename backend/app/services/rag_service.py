@@ -1,54 +1,82 @@
 import json
+import re
 import requests
 from app.core.config import settings
 from app.db.vector_store import get_vector_store
 
-def _get_active_gemini_models(api_key: str) -> list:
-    """Dynamically fetches active models."""
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-    try:
-        resp = requests.get(list_url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            models = [
-                m.get("name") for m in data.get("models", [])
-                if "generateContent" in m.get("supportedGenerationMethods", [])
-            ]
-            flash_models = [m for m in models if "flash" in m.lower()]
-            other_models = [m for m in models if "flash" not in m.lower()]
-            return flash_models + other_models
-    except Exception:
-        pass
-    return ["models/gemini-1.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-pro"]
+def _clean_response_formatting(text: str) -> str:
+    """Removes markdown asterisks and robotic prefixes for clean GPT-style output."""
+    if not text:
+        return ""
+    
+    # 1. Remove bold/italic asterisks (**, *)
+    cleaned = re.sub(r'\*{1,3}', '', text)
+
+    # 2. Strip internal checklist leakage if any
+    if "Constraint Checklist" in cleaned:
+        cleaned = cleaned.split("Constraint Checklist")[0].strip()
+
+    # 3. Remove robotic starting phrases
+    prefixes_to_strip = [
+        "Based on the provided context,",
+        "Based on the context,",
+        "According to the provided context,",
+        "According to the text,",
+        "Based on the medical report provided in the context,",
+        "Based on the medical report,"
+    ]
+    for prefix in prefixes_to_strip:
+        if cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix):].strip()
+
+    return cleaned.strip()
 
 def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
     if not api_key:
         return "Backend Error: GOOGLE_API_KEY is not configured on the backend server."
 
-    models_to_try = _get_active_gemini_models(api_key)
+    # Direct fast-tier models for instant response without extra listing latency
+    models_to_try = [
+        "models/gemini-1.5-flash",
+        "models/gemini-2.0-flash",
+        "models/gemini-1.5-flash-latest",
+        "models/gemini-1.5-pro"
+    ]
+
     headers = {"Content-Type": "application/json"}
-    
+
     payload_system = {
-        "system_instruction": {"parts": [{"text": system_instruction}]},
-        "contents": [{"role": "user", "parts": [{"text": user_content}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1500}
+        "system_instruction": {
+            "parts": [{"text": system_instruction}]
+        },
+        "contents": [
+            {"role": "user", "parts": [{"text": user_content}]}
+        ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 800
+        }
     }
 
     alt_payload = {
-        "contents": [{"parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1500}
+        "contents": [{
+            "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]
+        }],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 800
+        }
     }
 
     last_error = ""
-    for model_name in models_to_try:
-        clean_model = model_name if model_name.startswith("models/") else f"models/{model_name}"
+    for clean_model in models_to_try:
         for api_version in ["v1beta", "v1"]:
             url = f"https://generativelanguage.googleapis.com/{api_version}/{clean_model}:generateContent?key={api_key}"
             try:
-                resp = requests.post(url, headers=headers, json=payload_system, timeout=25)
+                resp = requests.post(url, headers=headers, json=payload_system, timeout=8)
                 if resp.status_code != 200:
-                    resp = requests.post(url, headers=headers, json=alt_payload, timeout=25)
+                    resp = requests.post(url, headers=headers, json=alt_payload, timeout=8)
 
                 if resp.status_code == 200:
                     data = resp.json()
@@ -56,11 +84,8 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts and parts[0].get("text"):
-                            answer_text = parts[0].get("text", "").strip()
-                            if "Constraint Checklist" in answer_text:
-                                answer_text = answer_text.split("Constraint Checklist")[0].strip()
-                            if answer_text:
-                                return answer_text
+                            raw_answer = parts[0].get("text", "").strip()
+                            return _clean_response_formatting(raw_answer)
                 else:
                     last_error = f"{clean_model} ({api_version}): {resp.text}"
             except Exception as e:
@@ -70,41 +95,42 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
 def generate_rag_response(bot_id: str, question: str) -> str:
-    """Retrieves top relevant context and generates a thorough, accurate answer."""
+    """Retrieves relevant context and produces a fast, direct, clean answer."""
     try:
         vector_store = get_vector_store(bot_id)
         
-        # Search for top 6 chunks
-        docs = []
+        # k=4 provides optimal context density for speed and precision
         try:
-            retriever = vector_store.as_retriever(search_kwargs={"k": 6})
+            retriever = vector_store.as_retriever(search_kwargs={"k": 4})
             docs = retriever.invoke(question)
         except Exception:
             docs = []
 
-        context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
+        context = "\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
         system_instruction = (
-            "You are CloudBot, an intelligent, helpful, and versatile AI assistant.\n\n"
-            "Guidelines:\n"
-            "1. Primary Context: If the provided [CONTEXT] contains information relevant to the user query (e.g. details about the company, brand, website, or document), base your answer primarily on it.\n"
-            "2. General Knowledge: If the user asks general, technical (e.g., Python, programming, tech terms), or conceptual questions, answer them accurately and thoroughly using your full knowledge base.\n"
-            "3. Missing Specific Brand Details: If the user asks for specific private data or internal details that are completely missing from the context, answer using best relevant general knowledge and politely mention that specific internal records weren't found.\n"
-            "4. Formatting: Keep responses professional, clear, and well-structured using concise paragraphs and bullet points.\n"
-            "5. Do NOT refuse general questions or greetings by saying you lack context."
+            "You are CloudBot, an intelligent and highly capable AI assistant that responds like ChatGPT.\n\n"
+            "Style and Output Guidelines:\n"
+            "1. Be direct, natural, professional, and clear.\n"
+            "2. Do NOT use markdown bold stars (do not use '**' or '*'). Write plain, clean text.\n"
+            "3. Do NOT start answers with robotic phrases such as 'Based on the context' or 'According to the text'. Get straight to the point.\n"
+            "4. If formatting lists, use simple bullet points starting with a dash (-).\n"
+            "5. If relevant information is found in the context, answer accurately using it.\n"
+            "6. For general, conversational, or conceptual queries, respond helpfully and comprehensively.\n"
+            "7. If specific private records are required but not present in the context, state: 'I do not have enough information from the provided content.'"
         )
 
         user_content = (
-            f"[CONTEXT]:\n{context if context.strip() else 'No specific document context provided.'}\n\n"
+            f"Context Information:\n{context if context.strip() else 'No specific document context provided.'}\n\n"
             f"User Question: {question}\n\n"
-            f"Answer:"
+            f"Direct Answer:"
         )
 
         response = _call_gemini_api(system_instruction, user_content)
         if response and response.strip():
             return response.strip()
 
-        return "I am here to help. Could you please rephrase or elaborate on your question?"
+        return "I do not have enough information from the provided content."
 
     except Exception as e:
         return f"Chat processing error: {str(e)}"
