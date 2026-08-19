@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout, UserCheck, Phone, DownloadCloud
+  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout, UserCheck, DownloadCloud
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -53,7 +53,7 @@ export default function App() {
   const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
-  // Navigation Tabs: 'train' | 'appearance' | 'deploy' | 'leads' | 'integrations' | 'logs'
+  // 6 Workspace Tabs
   const [dashboardTab, setDashboardTab] = useState<'train' | 'appearance' | 'deploy' | 'leads' | 'integrations' | 'logs'>('train');
   const [activeTab, setActiveTab] = useState<'website' | 'youtube' | 'pdf'>('website');
   
@@ -97,6 +97,7 @@ export default function App() {
   const widgetSnippet = `<script\n  src="${originUrl}/widget.js"\n  data-bot-id="${currentBotId}"\n  defer>\n</script>`;
   const iframeSnippet = `<iframe\n  src="${supportPageUrl}"\n  width="100%"\n  height="600px"\n  frameborder="0"\n  style="border-radius: 12px; border: 1px solid #1e293b;">\n</iframe>`;
 
+  // Persistent Tab & Token Recovery
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
     if (savedToken) setToken(savedToken);
@@ -105,6 +106,7 @@ export default function App() {
     if (savedTab) setDashboardTab(savedTab as any);
   }, []);
 
+  // Persistent Active Bot Settings Recovery
   useEffect(() => {
     if (activeBot) {
       const savedColor = localStorage.getItem(`bot_color_${activeBot.id}`);
@@ -1393,7 +1395,6 @@ export default function App() {
                 </button>
               </div>
             )}
-
           </div>
         </div>
       )}
