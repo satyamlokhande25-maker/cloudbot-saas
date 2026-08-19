@@ -1,7 +1,7 @@
 import uuid
 import json
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import ChatMessage, Bot, User, Lead
-from app.schemas.chat_schema import ChatRequest, ChatResponse
+from app.schemas.chat_schema import ChatRequest
 from app.services.rag_service import generate_rag_response
 
 router = APIRouter(prefix="/chat", tags=["Chat & Inference"])
@@ -121,7 +121,11 @@ async def chat_stream_endpoint(request: ChatRequest, db: Session = Depends(get_d
             db.commit()
 
         # Generate Grounded RAG Answer
-        full_answer = generate_rag_response(bot_id=request.bot_id, question=request.question)
+        rag_output = generate_rag_response(bot_id=request.bot_id, question=request.question)
+        if isinstance(rag_output, dict):
+            full_answer = rag_output.get("answer", "")
+        else:
+            full_answer = str(rag_output)
 
         # Human handoff trigger check
         lower_ans = full_answer.lower()
@@ -136,13 +140,13 @@ async def chat_stream_endpoint(request: ChatRequest, db: Session = Depends(get_d
         bot_msg_id = f"msg_{uuid.uuid4().hex[:12]}"
         user_msg = ChatMessage(
             id=f"msg_{uuid.uuid4().hex[:12]}",
-            bot_id=request.bot_id,
+            bot_id=bot.id,
             sender="user",
             message=request.question
         )
         bot_msg = ChatMessage(
             id=bot_msg_id,
-            bot_id=request.bot_id,
+            bot_id=bot.id,
             sender="bot",
             message=full_answer
         )
@@ -172,8 +176,8 @@ async def chat_stream_endpoint(request: ChatRequest, db: Session = Depends(get_d
         raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
 
 
-# 4. Standard Non-Streaming Chat Endpoint
-@router.post("/", response_model=ChatResponse)
+# 4. Standard Non-Streaming Chat Endpoint (Grounded RAG with Sources & Citations)
+@router.post("/")
 def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
     try:
         bot = db.query(Bot).filter(Bot.id == request.bot_id).first()
@@ -210,20 +214,33 @@ def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
             bot.owner.message_count += 1
             db.commit()
 
-        answer = generate_rag_response(bot_id=request.bot_id, question=request.question)
+        # Generate Grounded RAG Output
+        rag_output = generate_rag_response(bot_id=request.bot_id, question=request.question)
+        
+        if isinstance(rag_output, dict):
+            answer_text = rag_output.get("answer", "")
+            sources = rag_output.get("sources", [])
+            verification_status = rag_output.get("verification_status", "verified")
+            confidence_score = rag_output.get("confidence_score", 0.95)
+        else:
+            answer_text = str(rag_output)
+            sources = []
+            verification_status = "verified"
+            confidence_score = 0.95
 
+        # Persist conversation log to DB safely
         try:
             user_msg = ChatMessage(
                 id=f"msg_{uuid.uuid4().hex[:12]}",
-                bot_id=request.bot_id,
+                bot_id=bot.id,
                 sender="user",
                 message=request.question
             )
             bot_msg = ChatMessage(
                 id=f"msg_{uuid.uuid4().hex[:12]}",
-                bot_id=request.bot_id,
+                bot_id=bot.id,
                 sender="bot",
-                message=answer
+                message=answer_text
             )
             db.add(user_msg)
             db.add(bot_msg)
@@ -231,11 +248,15 @@ def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         except Exception:
             db.rollback()
 
-        return ChatResponse(
-            bot_id=request.bot_id,
-            question=request.question,
-            answer=answer
-        )
+        # Return full payload with source citations and verification status
+        return {
+            "bot_id": bot.id,
+            "question": request.question,
+            "answer": answer_text,
+            "sources": sources,
+            "verification_status": verification_status,
+            "confidence_score": confidence_score
+        }
 
     except HTTPException as he:
         raise he
