@@ -119,7 +119,7 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
 def generate_rag_response(bot_id: str, question: str) -> dict:
-    """Universal RAG pipeline returning grounded response along with structured source citations."""
+    """Universal RAG pipeline returning grounded response along with deduplicated source citations."""
     try:
         vector_store = get_vector_store(bot_id)
         
@@ -131,7 +131,8 @@ def generate_rag_response(bot_id: str, question: str) -> dict:
         except Exception:
             docs = []
 
-        # Extract structured source metadata
+        # 🔹 Deduplication: Ensure duplicate filenames are merged into 1 clean button
+        seen_labels = set()
         sources = []
         for doc in docs:
             meta = doc.metadata or {}
@@ -146,11 +147,13 @@ def generate_rag_response(bot_id: str, question: str) -> dict:
             elif source_uri.startswith("http"):
                 label = f"Web: {source_uri[:35]}..."
 
-            sources.append({
-                "label": label,
-                "uri": source_uri,
-                "snippet": doc.page_content[:160].strip() + "..." if len(doc.page_content) > 160 else doc.page_content.strip()
-            })
+            if label not in seen_labels:
+                seen_labels.add(label)
+                sources.append({
+                    "label": label,
+                    "uri": source_uri,
+                    "snippet": doc.page_content[:160].strip() + "..." if len(doc.page_content) > 160 else doc.page_content.strip()
+                })
 
         context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
