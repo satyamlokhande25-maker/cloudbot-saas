@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout, UserCheck, DownloadCloud
+  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout, UserCheck, DownloadCloud,
+  ChevronDown, ChevronUp, AlertTriangle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -36,6 +37,20 @@ interface LeadItem {
   created_at: string;
 }
 
+interface SourceItem {
+  label: string;
+  uri: string;
+  snippet: string;
+}
+
+interface ChatMessage {
+  role: 'user' | 'bot';
+  text: string;
+  verificationStatus?: 'verified' | 'unverified';
+  confidenceScore?: number;
+  sources?: SourceItem[];
+}
+
 export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -64,11 +79,12 @@ export default function App() {
   const [trainStatus, setTrainStatus] = useState<{ type: 'success' | 'error' | 'loading'; msg: string } | null>(null);
 
   // Chat Playground States
-  const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'bot', text: 'Hello! Train me with your data sources, and ask me anything.' }
   ]);
   const [inputQuery, setInputQuery] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [expandedSourceIndex, setExpandedSourceIndex] = useState<string | null>(null);
 
   // Chat Logs State
   const [logs, setLogs] = useState<Array<{ id: string; sender: string; message: string; feedback?: string; created_at: string }>>([]);
@@ -262,7 +278,21 @@ export default function App() {
 
     try {
       const res = await askBot(activeBot.id, userMsg);
-      setMessages((prev) => [...prev, { role: 'bot', text: res.answer }]);
+      const botText = typeof res?.answer === 'string' ? res.answer : (res?.answer?.answer || 'I could not retrieve an answer.');
+      const sources = res?.sources || res?.answer?.sources;
+      const verificationStatus = res?.verification_status || res?.answer?.verification_status || 'verified';
+      const confidenceScore = res?.confidence_score || res?.answer?.confidence_score || 0.95;
+
+      setMessages((prev) => [
+        ...prev, 
+        { 
+          role: 'bot', 
+          text: botText,
+          sources: sources,
+          verificationStatus: verificationStatus,
+          confidenceScore: confidenceScore
+        }
+      ]);
     } catch (err: any) {
       const errorText = err.response?.status === 429 
         ? '⚠️ Free tier message limit reached. Please upgrade to continue.' 
@@ -639,7 +669,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Chat Playground */}
+            {/* Chat Playground with Verified Badges & Source Citations */}
             <div className="lg:col-span-6">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col h-[580px]">
                 <div className="border-b border-slate-800 pb-4 mb-4 flex items-center justify-between">
@@ -664,10 +694,61 @@ export default function App() {
                             : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
                         }`}
                       >
-                        {m.text}
+                        {/* Verified Grounded Badge */}
+                        {m.role === 'bot' && idx !== 0 && m.verificationStatus && (
+                          <div className="mb-2 pb-1.5 border-b border-slate-700/60 flex items-center">
+                            {m.verificationStatus === 'verified' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                Verified Grounded Answer {m.confidenceScore ? `(${Math.round(m.confidenceScore * 100)}%)` : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full">
+                                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                Unverified / General Knowledge
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="text-slate-200">{m.text}</div>
+
+                        {/* Source Citations with Expandable Snippets */}
+                        {m.sources && m.sources.length > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-700/60">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                              Verified Sources & Citations:
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {m.sources.map((src, sIdx) => {
+                                const isExpanded = expandedSourceIndex === `${idx}_${sIdx}`;
+                                return (
+                                  <div key={sIdx} className="flex flex-col">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedSourceIndex(isExpanded ? null : `${idx}_${sIdx}`)}
+                                      className="flex items-center gap-1 text-[10px] bg-slate-900 hover:bg-slate-950 border border-slate-700 text-indigo-300 px-2 py-0.5 rounded transition"
+                                    >
+                                      <FileText className="w-2.5 h-2.5 text-indigo-400" />
+                                      <span>{src.label}</span>
+                                      {isExpanded ? <ChevronUp className="w-2.5 h-2.5 text-slate-400" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-400" />}
+                                    </button>
+
+                                    {isExpanded && (
+                                      <div className="mt-1 p-2 bg-slate-950 border border-slate-800 rounded-lg text-[10px] text-slate-300 font-mono">
+                                        <p className="italic text-slate-300">"{src.snippet}"</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
+
                   {isChatLoading && (
                     <div className="flex justify-start">
                       <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-none px-4 py-3 text-xs flex items-center gap-1.5 text-slate-400">
@@ -1136,7 +1217,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Upgrade Pro */}
+              {/* Upgrade */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden">
                 <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
                   PRO Plan ($19/mo)
@@ -1210,7 +1291,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Dynamic Modals */}
+      {/* Dynamic Modals for 9 Integrations */}
       {activeModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg text-white shadow-2xl relative">
