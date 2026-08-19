@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bot, Globe, Video, FileText, Send, Sparkles, 
   CheckCircle2, AlertCircle, Loader2, Code2, Copy, LogOut, Lock, Mail, MessageSquare, History, Plus,
-  Palette, Layers, X
+  Palette, Layers, X, Share2, Smartphone, Download, ExternalLink, Layout
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   registerUser, 
   loginUser, 
@@ -43,8 +44,8 @@ export default function App() {
   const [newBotColor, setNewBotColor] = useState('#4f46e5');
   const [isCreatingBot, setIsCreatingBot] = useState(false);
 
-  // Navigation Tabs
-  const [dashboardTab, setDashboardTab] = useState<'train' | 'logs' | 'appearance' | 'integrations'>('train');
+  // Navigation Tabs: 'train' | 'appearance' | 'deploy' | 'integrations' | 'logs'
+  const [dashboardTab, setDashboardTab] = useState<'train' | 'appearance' | 'deploy' | 'integrations' | 'logs'>('train');
   const [activeTab, setActiveTab] = useState<'website' | 'youtube' | 'pdf'>('website');
   
   // Ingestion States
@@ -69,13 +70,19 @@ export default function App() {
   const [welcomeMessage, setWelcomeMessage] = useState('Hello! How can I assist you today?');
   const [appearanceSaved, setAppearanceSaved] = useState(false);
 
-  // Dynamic 9-Integrations Modals
+  // Modals & Copy Keys
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [tgToken, setTgToken] = useState('');
   const [tgSaved, setTgSaved] = useState(false);
 
   const BASE_URL = "https://cloudbot-saas.onrender.com";
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://cloudbot-saas.vercel.app';
+  const currentBotId = activeBot?.id || 'test_bot_1';
+  const supportPageUrl = `${originUrl}/chat/${currentBotId}`;
+  const directLinkUrl = `${originUrl}/chat/${currentBotId}`;
+  const widgetSnippet = `<script\n  src="${originUrl}/widget.js"\n  data-bot-id="${currentBotId}"\n  defer>\n</script>`;
+  const iframeSnippet = `<iframe\n  src="${supportPageUrl}"\n  width="100%"\n  height="600px"\n  frameborder="0"\n  style="border-radius: 12px; border: 1px solid #1e293b;">\n</iframe>`;
 
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
@@ -227,19 +234,13 @@ export default function App() {
       setMessages((prev) => [...prev, { role: 'bot', text: res.answer }]);
     } catch (err: any) {
       const errorText = err.response?.status === 429 
-        ? '⚠️ Free tier message limit reached (50/50). Please contact support to continue.' 
+        ? '⚠️ Free tier message limit reached. Please upgrade to continue.' 
         : 'Error: Could not retrieve answer.';
       setMessages((prev) => [...prev, { role: 'bot', text: errorText }]);
     } finally {
       setIsChatLoading(false);
     }
   };
-
-  const widgetSnippet = `<script 
-  src="https://cloudbot-saas.vercel.app/widget.js" 
-  data-bot-id="${activeBot?.id || 'test_bot_1'}" 
-  defer>
-</script>`;
 
   const copyText = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -256,9 +257,29 @@ export default function App() {
     setTimeout(() => setAppearanceSaved(false), 2000);
   };
 
-  const handleTabChange = (tab: 'train' | 'logs' | 'appearance' | 'integrations') => {
+  const handleTabChange = (tab: 'train' | 'appearance' | 'deploy' | 'integrations' | 'logs') => {
     setDashboardTab(tab);
     localStorage.setItem('dashboard_tab', tab);
+  };
+
+  const downloadQR = () => {
+    const svg = document.getElementById('bot-qr-code');
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      const pngFile = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.download = `${currentBotId}-qr.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
   if (!token) {
@@ -397,6 +418,14 @@ export default function App() {
               }`}
             >
               <Palette className="w-4 h-4" /> Appearance & Theme
+            </button>
+            <button
+              onClick={() => handleTabChange('deploy')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                dashboardTab === 'deploy' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Share2 className="w-4 h-4" /> Deploy Hub (QR & Page)
             </button>
             <button
               onClick={() => handleTabChange('integrations')}
@@ -685,7 +714,151 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Complete 9 Native Integrations */}
+        {/* Tab 3: FastBots-style Deploy Hub (QR, Standalone Page, Embeds) */}
+        {dashboardTab === 'deploy' && (
+          <div className="flex flex-col gap-6 max-w-5xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-indigo-400" /> Deployment & Sharing Hub
+                </h2>
+                <p className="text-xs text-slate-400">Share your AI chatbot via hosted link, QR code, website widget, or inline embed.</p>
+              </div>
+              <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 px-3 py-1.5 rounded-lg font-mono">
+                Bot: {currentBotId}
+              </span>
+            </div>
+
+            {/* 1. Support Page */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/20 text-indigo-400">
+                  <Globe className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-white">Support Page</h3>
+                  <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-medium text-indigo-400 uppercase">
+                    New
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400 mb-4">
+                A hosted, branded standalone support page for your chatbot. Send customers directly to your dedicated chat URL without requiring any website or code modifications.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-300 font-mono overflow-x-auto">
+                  {supportPageUrl}
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => copyText(supportPageUrl, 'support_page')}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition"
+                  >
+                    {copiedKey === 'support_page' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'support_page' ? 'Copied' : 'Copy'}
+                  </button>
+                  <a
+                    href={supportPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
+                  >
+                    Open Page <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Direct Link & QR Code */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/20 text-indigo-400">
+                      <Smartphone className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-white">Direct Link</h3>
+                  </div>
+                  <p className="text-xs leading-relaxed text-slate-400 mb-4">
+                    Share instant access to your chatbot via direct URL in social media bios, WhatsApp status, or email signatures.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-300 font-mono truncate">
+                    {directLinkUrl}
+                  </div>
+                  <button
+                    onClick={() => copyText(directLinkUrl, 'direct_link')}
+                    className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition"
+                  >
+                    {copiedKey === 'direct_link' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'direct_link' ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur flex flex-col items-center justify-center text-center">
+                <div className="p-3 bg-white rounded-xl shadow-lg mb-3">
+                  <QRCodeSVG id="bot-qr-code" value={directLinkUrl} size={105} />
+                </div>
+                <button
+                  onClick={downloadQR}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-500 transition w-full justify-center"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download QR
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Add to a Website */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/20 text-indigo-400">
+                  <Code2 className="h-4 w-4" />
+                </div>
+                <h3 className="text-base font-semibold text-white">Add to a Website</h3>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400 mb-4">
+                Add the code below before the closing &lt;/body&gt; tag of your website (WordPress, Shopify, Webflow, React) to render a floating chat bubble on all pages.
+              </p>
+              <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-indigo-300">
+                <pre className="overflow-x-auto whitespace-pre-wrap">{widgetSnippet}</pre>
+                <button
+                  onClick={() => copyText(widgetSnippet, 'script_snippet')}
+                  className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700 transition"
+                >
+                  {copiedKey === 'script_snippet' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedKey === 'script_snippet' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            {/* 4. Display Inside Webpage */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/20 text-indigo-400">
+                  <Layout className="h-4 w-4" />
+                </div>
+                <h3 className="text-base font-semibold text-white">Display Inside Webpage</h3>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400 mb-4">
+                Embed the chatbot directly into an inline container (such as inside a Contact Us page or Help Center) rather than a floating bottom bubble.
+              </p>
+              <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-emerald-300">
+                <pre className="overflow-x-auto whitespace-pre-wrap">{iframeSnippet}</pre>
+                <button
+                  onClick={() => copyText(iframeSnippet, 'iframe_snippet')}
+                  className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700 transition"
+                >
+                  {copiedKey === 'iframe_snippet' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedKey === 'iframe_snippet' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Integrations (9 Channels) */}
         {dashboardTab === 'integrations' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -696,13 +869,13 @@ export default function App() {
                 <p className="text-xs text-slate-400">Connect your trained bot across 9 messaging, automation & CMS platforms for free.</p>
               </div>
               <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 px-3 py-1.5 rounded-lg font-mono">
-                Active Bot: {activeBot?.id || 'test_bot_1'}
+                Active Bot: {currentBotId}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               
-              {/* 1. WhatsApp Cloud API */}
+              {/* WhatsApp */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -720,7 +893,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 2. Telegram Bot */}
+              {/* Telegram */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -738,7 +911,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 3. WordPress & HTML Embed */}
+              {/* WordPress */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -757,7 +930,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 4. Slack Workspace */}
+              {/* Slack */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -775,7 +948,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 5. Discord Server Bot */}
+              {/* Discord */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -793,7 +966,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 6. Zapier & Make.com Webhook */}
+              {/* Webhook */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -811,7 +984,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 7. Twilio SMS & WhatsApp */}
+              {/* Twilio */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -829,7 +1002,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 8. Shopify Storefront */}
+              {/* Shopify */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -847,7 +1020,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* 9. Messenger & Instagram DM */}
+              {/* Upgrade Pro */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden">
                 <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
                   PRO Plan ($19/mo)
@@ -871,7 +1044,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 4: Logs */}
+        {/* Tab 5: Logs */}
         {dashboardTab === 'logs' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
@@ -879,7 +1052,7 @@ export default function App() {
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-indigo-400" /> Recorded Logs ({activeBot?.name})
                 </h2>
-                <p className="text-xs text-slate-400">Questions asked to {activeBot?.id}</p>
+                <p className="text-xs text-slate-400">Questions asked to {currentBotId}</p>
               </div>
               <button 
                 onClick={fetchLogs} 
@@ -915,7 +1088,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Dynamic Modals for all 9 Integrations */}
+      {/* Dynamic Modals */}
       {activeModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg text-white shadow-2xl relative">
@@ -933,12 +1106,12 @@ export default function App() {
                 <p className="text-xs text-slate-400">Meta provides 1,000 free conversations every month. Use these details in developers.facebook.com:</p>
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
                   <div className="text-[11px] text-slate-400">Callback URL:</div>
-                  <div className="font-mono text-emerald-400 text-[11px] break-all">{`${BASE_URL}/integrations/whatsapp/${activeBot?.id || 'test_bot_1'}`}</div>
+                  <div className="font-mono text-emerald-400 text-[11px] break-all">{`${BASE_URL}/integrations/whatsapp/${currentBotId}`}</div>
                   <div className="text-[11px] text-slate-400 pt-1">Verify Token:</div>
                   <div className="font-mono text-amber-300 text-[11px]">cloudbot_secret_token_2026</div>
                 </div>
                 <button 
-                  onClick={() => copyText(`${BASE_URL}/integrations/whatsapp/${activeBot?.id || 'test_bot_1'}`, 'wa_url')}
+                  onClick={() => copyText(`${BASE_URL}/integrations/whatsapp/${currentBotId}`, 'wa_url')}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   {copiedKey === 'wa_url' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -962,7 +1135,7 @@ export default function App() {
                 <button 
                   onClick={() => {
                     if (tgToken.trim()) {
-                      const tgWebhookUrl = `${BASE_URL}/integrations/telegram/${activeBot?.id || 'test_bot_1'}?token=${tgToken.trim()}`;
+                      const tgWebhookUrl = `${BASE_URL}/integrations/telegram/${currentBotId}?token=${tgToken.trim()}`;
                       fetch(`https://api.telegram.org/bot${tgToken.trim()}/setWebhook?url=${encodeURIComponent(tgWebhookUrl)}`)
                         .then(() => {
                           setTgSaved(true);
@@ -1001,10 +1174,10 @@ export default function App() {
                 <h3 className="text-base font-bold flex items-center gap-2">💼 Slack Workspace Setup</h3>
                 <p className="text-xs text-slate-400">Set this Request URL in your Slack App Event Subscriptions:</p>
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
-                  <div className="font-mono text-amber-300 text-[11px] break-all">{`${BASE_URL}/integrations/slack/${activeBot?.id || 'test_bot_1'}`}</div>
+                  <div className="font-mono text-amber-300 text-[11px] break-all">{`${BASE_URL}/integrations/slack/${currentBotId}`}</div>
                 </div>
                 <button 
-                  onClick={() => copyText(`${BASE_URL}/integrations/slack/${activeBot?.id || 'test_bot_1'}`, 'slack_copy')}
+                  onClick={() => copyText(`${BASE_URL}/integrations/slack/${currentBotId}`, 'slack_copy')}
                   className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   {copiedKey === 'slack_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -1019,10 +1192,10 @@ export default function App() {
                 <h3 className="text-base font-bold flex items-center gap-2">👾 Discord Bot Setup</h3>
                 <p className="text-xs text-slate-400">Set this Interactions Webhook URL in Discord Developer Portal:</p>
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
-                  <div className="font-mono text-indigo-300 text-[11px] break-all">{`${BASE_URL}/integrations/discord/${activeBot?.id || 'test_bot_1'}`}</div>
+                  <div className="font-mono text-indigo-300 text-[11px] break-all">{`${BASE_URL}/integrations/discord/${currentBotId}`}</div>
                 </div>
                 <button 
-                  onClick={() => copyText(`${BASE_URL}/integrations/discord/${activeBot?.id || 'test_bot_1'}`, 'disc_copy')}
+                  onClick={() => copyText(`${BASE_URL}/integrations/discord/${currentBotId}`, 'disc_copy')}
                   className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   {copiedKey === 'disc_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -1038,12 +1211,12 @@ export default function App() {
                 <p className="text-xs text-slate-400">Send standard POST requests to connect your bot with any CRM or Google Sheets:</p>
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
                   <div className="text-[11px] text-slate-400">POST Endpoint:</div>
-                  <div className="font-mono text-indigo-300 text-[11px] break-all">{`${BASE_URL}/integrations/webhook/${activeBot?.id || 'test_bot_1'}`}</div>
+                  <div className="font-mono text-indigo-300 text-[11px] break-all">{`${BASE_URL}/integrations/webhook/${currentBotId}`}</div>
                   <div className="text-[11px] text-slate-400 pt-1">Payload (JSON):</div>
                   <pre className="text-[10px] text-amber-300 font-mono bg-slate-900 p-2 rounded">{`{ "question": "Customer question here" }`}</pre>
                 </div>
                 <button 
-                  onClick={() => copyText(`${BASE_URL}/integrations/webhook/${activeBot?.id || 'test_bot_1'}`, 'webhook_copy')}
+                  onClick={() => copyText(`${BASE_URL}/integrations/webhook/${currentBotId}`, 'webhook_copy')}
                   className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   {copiedKey === 'webhook_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -1058,10 +1231,10 @@ export default function App() {
                 <h3 className="text-base font-bold flex items-center gap-2">📱 Twilio SMS Setup</h3>
                 <p className="text-xs text-slate-400">In Twilio Console ➔ Phone Numbers ➔ Messaging, paste this Webhook URL for incoming messages:</p>
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
-                  <div className="font-mono text-emerald-400 text-[11px] break-all">{`${BASE_URL}/integrations/twilio/${activeBot?.id || 'test_bot_1'}`}</div>
+                  <div className="font-mono text-emerald-400 text-[11px] break-all">{`${BASE_URL}/integrations/twilio/${currentBotId}`}</div>
                 </div>
                 <button 
-                  onClick={() => copyText(`${BASE_URL}/integrations/twilio/${activeBot?.id || 'test_bot_1'}`, 'tw_copy')}
+                  onClick={() => copyText(`${BASE_URL}/integrations/twilio/${currentBotId}`, 'tw_copy')}
                   className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   {copiedKey === 'tw_copy' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
