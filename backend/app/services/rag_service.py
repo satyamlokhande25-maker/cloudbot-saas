@@ -118,8 +118,8 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
 
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
-def generate_rag_response(bot_id: str, question: str) -> str:
-    """Universal RAG pipeline supporting websites, videos, documents, and general inquiries."""
+def generate_rag_response(bot_id: str, question: str) -> dict:
+    """Universal RAG pipeline returning grounded response along with structured source citations."""
     try:
         vector_store = get_vector_store(bot_id)
         
@@ -131,9 +131,30 @@ def generate_rag_response(bot_id: str, question: str) -> str:
         except Exception:
             docs = []
 
+        # Extract structured source metadata
+        sources = []
+        for doc in docs:
+            meta = doc.metadata or {}
+            source_uri = meta.get("source", "Trained Document")
+            page_num = meta.get("page", None)
+            
+            label = os.path.basename(source_uri)
+            if page_num is not None:
+                label = f"{label} (Page {page_num + 1})"
+            elif "youtube.com" in source_uri or "youtu.be" in source_uri:
+                label = "YouTube Reference"
+            elif source_uri.startswith("http"):
+                label = f"Web: {source_uri[:35]}..."
+
+            sources.append({
+                "label": label,
+                "uri": source_uri,
+                "snippet": doc.page_content[:160].strip() + "..." if len(doc.page_content) > 160 else doc.page_content.strip()
+            })
+
         context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
-        # 100% Universal, Domain-Agnostic System Prompt
+        # Universal, Domain-Agnostic System Prompt
         system_instruction = (
             "You are CloudBot, an intelligent, helpful, and highly versatile AI assistant.\n\n"
             "Core Guidelines:\n"
@@ -151,10 +172,20 @@ def generate_rag_response(bot_id: str, question: str) -> str:
         )
 
         response = _call_gemini_api(system_instruction, user_content)
-        if response and response.strip():
-            return response.strip()
+        raw_answer = response.strip() if response and response.strip() else "I do not have enough information from the provided content."
+        is_unverified = "do not have enough information" in raw_answer.lower()
 
-        return "I do not have enough information from the provided content."
+        return {
+            "answer": raw_answer,
+            "sources": [] if is_unverified else sources,
+            "verification_status": "unverified" if is_unverified else "verified",
+            "confidence_score": 0.20 if is_unverified else 0.95
+        }
 
     except Exception as e:
-        return f"Chat processing error: {str(e)}"
+        return {
+            "answer": f"Chat processing error: {str(e)}",
+            "sources": [],
+            "verification_status": "unverified",
+            "confidence_score": 0.0
+        }
