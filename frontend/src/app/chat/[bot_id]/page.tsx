@@ -2,13 +2,34 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react';
+import { 
+  Send, 
+  Bot, 
+  User, 
+  Sparkles, 
+  RefreshCw, 
+  CheckCircle2, 
+  AlertTriangle, 
+  FileText, 
+  ExternalLink, 
+  ChevronDown, 
+  ChevronUp 
+} from 'lucide-react';
 import axios from 'axios';
+
+interface SourceItem {
+  label: string;
+  uri: string;
+  snippet: string;
+}
 
 interface Message {
   id: string;
   sender: 'user' | 'bot';
   text: string;
+  verificationStatus?: 'verified' | 'unverified';
+  confidenceScore?: number;
+  sources?: SourceItem[];
 }
 
 export default function StandaloneChatPage() {
@@ -17,6 +38,7 @@ export default function StandaloneChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [expandedSourceIndex, setExpandedSourceIndex] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cloudbot-saas.onrender.com';
@@ -33,7 +55,7 @@ export default function StandaloneChatPage() {
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [messages, loading, expandedSourceIndex]);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -51,10 +73,37 @@ export default function StandaloneChatPage() {
         question: userText
       });
 
-      const botReply = response.data?.answer || 'I could not retrieve an answer.';
+      const rawData = response.data;
+      let botReply = 'I could not retrieve an answer.';
+      let sources: SourceItem[] | undefined = undefined;
+      let verificationStatus: 'verified' | 'unverified' | undefined = undefined;
+      let confidenceScore: number | undefined = undefined;
+
+      // Handle both standard string and structured assurance response gracefully
+      if (typeof rawData?.answer === 'string') {
+        botReply = rawData.answer;
+      } else if (rawData?.answer && typeof rawData.answer === 'object') {
+        botReply = rawData.answer.answer || 'I could not retrieve an answer.';
+        sources = rawData.answer.sources;
+        verificationStatus = rawData.answer.verification_status;
+        confidenceScore = rawData.answer.confidence_score;
+      }
+
+      // If sources or verification exist at root level
+      if (rawData?.sources) sources = rawData.sources;
+      if (rawData?.verification_status) verificationStatus = rawData.verification_status;
+      if (rawData?.confidence_score) confidenceScore = rawData.confidence_score;
+
       setMessages((prev) => [
         ...prev,
-        { id: `b_${Date.now()}`, sender: 'bot', text: botReply }
+        { 
+          id: `b_${Date.now()}`, 
+          sender: 'bot', 
+          text: botReply,
+          verificationStatus,
+          confidenceScore,
+          sources
+        }
       ]);
     } catch (err: any) {
       setMessages((prev) => [
@@ -64,6 +113,11 @@ export default function StandaloneChatPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleSourceSnippet = (msgId: string, srcIdx: number) => {
+    const key = `${msgId}_${srcIdx}`;
+    setExpandedSourceIndex(prev => prev === key ? null : key);
   };
 
   return (
@@ -100,6 +154,7 @@ export default function StandaloneChatPage() {
                   <Bot className="h-4 w-4" />
                 </div>
               )}
+              
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                   m.sender === 'user'
@@ -107,8 +162,80 @@ export default function StandaloneChatPage() {
                     : 'bg-slate-900 text-slate-200 rounded-bl-none border border-slate-800 shadow-md'
                 }`}
               >
-                {m.text}
+                {/* 1. Optional Verification Assurance Badge */}
+                {m.sender === 'bot' && m.verificationStatus && (
+                  <div className="mb-2 pb-2 border-b border-slate-800/80 flex items-center">
+                    {m.verificationStatus === 'verified' ? (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/70 px-2.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Verified Grounded Answer {m.confidenceScore ? `(${Math.round(m.confidenceScore * 100)}%)` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 bg-amber-950/60 border border-amber-800/70 px-2.5 py-0.5 rounded-full">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                        Unverified / General Knowledge
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. Main Message Text */}
+                <div className="text-slate-200">
+                  {m.text}
+                </div>
+
+                {/* 3. Source Traceability Badges (Citations) */}
+                {m.sources && m.sources.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Verified Sources & Citations:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.sources.map((src, sIdx) => {
+                        const isExpanded = expandedSourceIndex === `${m.id}_${sIdx}`;
+                        return (
+                          <div key={sIdx} className="flex flex-col">
+                            <button
+                              type="button"
+                              onClick={() => toggleSourceSnippet(m.id, sIdx)}
+                              className="flex items-center gap-1.5 text-[11px] bg-slate-950 hover:bg-slate-800 border border-slate-700/80 text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              <FileText className="w-3 h-3 text-indigo-400" />
+                              <span>{src.label}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3 h-3 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                              )}
+                            </button>
+
+                            {/* Dropdown Exact Document Snippet */}
+                            {isExpanded && (
+                              <div className="mt-1.5 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 font-mono leading-relaxed shadow-inner max-w-sm">
+                                <div className="text-slate-500 font-semibold mb-1 flex items-center justify-between">
+                                  <span>Document Snippet:</span>
+                                  {src.uri && src.uri.startsWith('http') && (
+                                    <a
+                                      href={src.uri}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-indigo-400 flex items-center gap-0.5 hover:underline"
+                                    >
+                                      Open <ExternalLink className="w-2.5 h-2.5" />
+                                    </a>
+                                  )}
+                                </div>
+                                <p className="italic text-slate-300">"{src.snippet}"</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
+
               {m.sender === 'user' && (
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-slate-400 border border-slate-700">
                   <User className="h-4 w-4" />
