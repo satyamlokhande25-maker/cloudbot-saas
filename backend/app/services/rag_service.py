@@ -6,26 +6,26 @@ from app.core.config import settings
 from app.db.vector_store import get_vector_store
 
 def _clean_response_formatting(text: str) -> str:
-    """Removes markdown asterisks (*, **) and robotic boilerplate prefixes."""
+    """Universal output cleaner: removes markdown asterisks and robotic prefixes."""
     if not text:
         return ""
     
-    # 1. Markdown asterisks strip
+    # 1. Clean bold/italic asterisks
     cleaned = re.sub(r'\*{1,3}', '', text)
 
-    # 2. Strip internal checklist/meta-talk
+    # 2. Strip checklist leaks if any
     if "Constraint Checklist" in cleaned:
         cleaned = cleaned.split("Constraint Checklist")[0].strip()
 
-    # 3. Remove robotic boilerplate greetings/prefixes
+    # 3. Strip all generic boilerplate starting prefixes
     prefixes_to_strip = [
         "Based on the provided context,",
         "Based on the context,",
         "According to the provided context,",
-        "According to the medical report provided in the context,",
-        "According to the medical report,",
-        "Based on the medical report provided in the context,",
-        "Based on the medical report,"
+        "According to the text,",
+        "According to the document,",
+        "According to the video,",
+        "Based on the content provided,"
     ]
     for prefix in prefixes_to_strip:
         if cleaned.lower().startswith(prefix.lower()):
@@ -33,122 +33,126 @@ def _clean_response_formatting(text: str) -> str:
 
     return cleaned.strip()
 
+def _get_active_gemini_models(api_key: str) -> list:
+    """Dynamically fetches active models."""
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    try:
+        resp = requests.get(list_url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            models = [
+                m.get("name") for m in data.get("models", [])
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+            ]
+            flash_models = [m for m in models if "flash" in m.lower()]
+            other_models = [m for m in models if "flash" not in m.lower()]
+            return flash_models + other_models
+    except Exception:
+        pass
+    return ["models/gemini-1.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-pro"]
+
 def _call_gemini_api(system_instruction: str, user_content: str) -> str:
-    """Primary Provider: Ultra-fast Google Gemini via v1beta REST API."""
     api_key = str(getattr(settings, "GOOGLE_API_KEY", "")).strip()
     if not api_key:
-        raise ValueError("GOOGLE_API_KEY not configured")
+        return "Backend Error: GOOGLE_API_KEY is not configured on the backend server."
 
-    models_to_try = [
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-pro"
-    ]
-
+    models_to_try = _get_active_gemini_models(api_key)
     headers = {"Content-Type": "application/json"}
-    payload = {
+    
+    payload_system = {
         "system_instruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"role": "user", "parts": [{"text": user_content}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 800
-        }
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000}
+    }
+
+    alt_payload = {
+        "contents": [{"parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000}
     }
 
     last_error = ""
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=4)
-            if resp.status_code == 200:
-                data = resp.json()
-                candidates = data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts and parts[0].get("text"):
-                        return _clean_response_formatting(parts[0].get("text"))
-            else:
-                last_error = resp.text
-        except Exception as e:
-            last_error = str(e)
-            continue
+    for model_name in models_to_try:
+        clean_model = model_name if model_name.startswith("models/") else f"models/{model_name}"
+        for api_version in ["v1beta", "v1"]:
+            url = f"https://generativelanguage.googleapis.com/{api_version}/{clean_model}:generateContent?key={api_key}"
+            try:
+                resp = requests.post(url, headers=headers, json=payload_system, timeout=15)
+                if resp.status_code != 200:
+                    resp = requests.post(url, headers=headers, json=alt_payload, timeout=15)
 
-    raise RuntimeError(f"Gemini failed: {last_error}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and parts[0].get("text"):
+                            answer_text = parts[0].get("text", "").strip()
+                            return _clean_response_formatting(answer_text)
+                else:
+                    last_error = f"{clean_model} ({api_version}): {resp.text}"
+            except Exception as e:
+                last_error = str(e)
+                continue
 
-def _call_groq_api(system_instruction: str, user_content: str) -> str:
-    """Secondary Provider: High-speed Groq Llama-3 failover engine."""
+    # Fallback to Groq if configured
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    if not groq_key:
-        raise ValueError("GROQ_API_KEY not configured")
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
-    }
-
-    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
-
-    for model in models_to_try:
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content}
-            ],
-            "temperature": 0.2,
-            "max_tokens": 800
-        }
+    if groq_key:
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=4)
-            if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
+            groq_url = "https://api.groq.com/openai/v1/chat/completions"
+            groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+            groq_payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": user_content}
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1000
+            }
+            groq_resp = requests.post(groq_url, headers=groq_headers, json=groq_payload, timeout=8)
+            if groq_resp.status_code == 200:
+                content = groq_resp.json()["choices"][0]["message"]["content"]
                 return _clean_response_formatting(content)
         except Exception:
-            continue
+            pass
 
-    raise RuntimeError("All Groq models failed")
+    return f"Unable to fetch response from AI model. Details: {last_error}"
 
 def generate_rag_response(bot_id: str, question: str) -> str:
-    """Multi-Engine RAG Pipeline with zero-downtime automatic failover."""
+    """Universal RAG pipeline supporting websites, videos, documents, and general inquiries."""
     try:
         vector_store = get_vector_store(bot_id)
         
+        # k=6 provides balanced context coverage across all formats
+        docs = []
         try:
-            retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+            retriever = vector_store.as_retriever(search_kwargs={"k": 6})
             docs = retriever.invoke(question)
         except Exception:
             docs = []
 
-        context = "\n\n".join([doc.page_content for doc in docs]) if docs else ""
+        context = "\n\n---\n\n".join([doc.page_content for doc in docs]) if docs else ""
 
+        # 100% Universal, Domain-Agnostic System Prompt
         system_instruction = (
-            "You are CloudBot, an intelligent and professional AI assistant.\n\n"
-            "Guidelines:\n"
-            "1. Answer clearly, accurately, and naturally without asterisks (do not use '*' or '**').\n"
-            "2. Never use robotic prefixes like 'Based on the context' or 'According to the report'. State facts directly.\n"
-            "3. If relevant information exists in the provided context, answer strictly using it.\n"
-            "4. For general or technical questions, answer thoroughly using your knowledge.\n"
-            "5. If specific private records are missing from the context, state: 'I do not have enough information from the provided content.'"
+            "You are CloudBot, an intelligent, helpful, and highly versatile AI assistant.\n\n"
+            "Core Guidelines:\n"
+            "1. Primary Knowledge: If the provided [CONTEXT] contains facts relevant to the user query (regardless of whether it came from a website, video transcript, or document), synthesize and answer directly based on it.\n"
+            "2. General Inquiries & Small Talk: For general greetings, technical concepts, coding, or common knowledge questions, answer helpfully and accurately using your broad knowledge base.\n"
+            "3. Clean Formatting: Provide a clear, natural response without markdown asterisks (never use '**' or '*'). Format lists using simple bullet points (-).\n"
+            "4. Direct Tone: Do NOT open answers with robotic introductory phrases like 'Based on the provided context'. Jump straight to the information.\n"
+            "5. Missing Proprietary Information: Only if the user specifically asks for unique private/internal data that is entirely absent from the context, state: 'I do not have enough information from the provided content.'"
         )
 
         user_content = (
-            f"Context:\n{context if context.strip() else 'No specific document context provided.'}\n\n"
-            f"Question:\n{question}\n\n"
-            f"Direct Answer:"
+            f"[CONTEXT]:\n{context if context.strip() else 'No specific document or website context provided.'}\n\n"
+            f"User Question: {question}\n\n"
+            f"Answer:"
         )
 
-        # 1. Primary Attempt: Google Gemini Engine
-        try:
-            return _call_gemini_api(system_instruction, user_content)
-        except Exception as gemini_err:
-            print(f"[Engine Switch] Gemini failed ({gemini_err}). Triggering Groq Fallback...")
-
-        # 2. Secondary Attempt: Groq Cloud Engine
-        try:
-            return _call_groq_api(system_instruction, user_content)
-        except Exception as groq_err:
-            print(f"[Engine Switch] Groq fallback failed ({groq_err}).")
+        response = _call_gemini_api(system_instruction, user_content)
+        if response and response.strip():
+            return response.strip()
 
         return "I do not have enough information from the provided content."
 
