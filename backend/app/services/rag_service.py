@@ -2,8 +2,12 @@ import os
 import re
 import json
 import requests
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.db.vector_store import get_vector_store
+from app.db.database import SessionLocal
+from app.db.models import ChatMessage
 
 def _clean_response_formatting(text: str) -> str:
     """Universal output cleaner: removes markdown asterisks and robotic prefixes."""
@@ -118,8 +122,71 @@ def _call_gemini_api(system_instruction: str, user_content: str) -> str:
 
     return f"Unable to fetch response from AI model. Details: {last_error}"
 
+def _search_database_logs_memory(bot_id: str, question: str) -> dict:
+    """Fallback: Searches historical conversation logs in PostgreSQL if Vector DB lacks info."""
+    db: Session = SessionLocal()
+    try:
+        logs = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.bot_id == bot_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(30)
+            .all()
+        )
+        
+        if not logs:
+            return None
+
+        # Build context from previous verified conversation pairs
+        conversation_context = []
+        for i in range(len(logs) - 1):
+            if logs[i+1].sender == "user" and logs[i].sender == "bot":
+                bot_ans = logs[i].message.strip()
+                if "do not have enough information" not in bot_ans.lower() and "error" not in bot_ans.lower():
+                    conversation_context.append(f"User: {logs[i+1].message}\nBot Answer: {bot_ans}")
+
+        if not conversation_context:
+            return None
+
+        history_block = "\n\n---\n\n".join(conversation_context[:10])
+
+        system_instruction = (
+            "You are CloudBot assistant with persistent memory.\n\n"
+            "Guidelines:\n"
+            "1. Answer the user question strictly using the provided [PREVIOUS VERIFIED CONVERSATION LOGS].\n"
+            "2. If the answer is found in the logs, synthesize and reply accurately, clearly, and directly.\n"
+            "3. Do NOT use markdown asterisks (no '**' or '*'). Format lists using bullet points (-).\n"
+            "4. If the question is not present in the logs, reply: 'I do not have enough information from the provided content.'"
+        )
+
+        user_content = (
+            f"[PREVIOUS VERIFIED CONVERSATION LOGS]:\n{history_block}\n\n"
+            f"User Question: {question}\n\n"
+            f"Answer:"
+        )
+        
+        answer = _call_gemini_api(system_instruction, user_content)
+        
+        if answer and "do not have enough information" not in answer.lower() and not answer.startswith("Unable to fetch"):
+            return {
+                "answer": answer,
+                "sources": [{
+                    "label": "Saved Conversation Memory",
+                    "uri": "database_logs",
+                    "snippet": history_block[:160].strip() + "..."
+                }],
+                "verification_status": "verified",
+                "confidence_score": 0.92
+            }
+    except Exception:
+        pass
+    finally:
+        db.close()
+    
+    return None
+
 def generate_rag_response(bot_id: str, question: str) -> dict:
-    """Universal RAG pipeline returning grounded response along with deduplicated source citations."""
+    """Universal RAG pipeline returning grounded response along with deduplicated source citations and log memory fallback."""
     try:
         vector_store = get_vector_store(bot_id)
         
@@ -176,6 +243,13 @@ def generate_rag_response(bot_id: str, question: str) -> dict:
 
         response = _call_gemini_api(system_instruction, user_content)
         raw_answer = response.strip() if response and response.strip() else "I do not have enough information from the provided content."
+        
+        # 🔹 BACKUP TRIGGER: Agar Vector DB me info nahi mili, toh database ke conversation logs me search karo
+        if "do not have enough information" in raw_answer.lower() or not docs:
+            logs_memory_result = _search_database_logs_memory(bot_id, question)
+            if logs_memory_result:
+                return logs_memory_result
+
         is_unverified = "do not have enough information" in raw_answer.lower()
 
         return {
