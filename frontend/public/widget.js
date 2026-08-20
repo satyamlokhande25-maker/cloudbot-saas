@@ -32,7 +32,7 @@
       display: none;
       flex-direction: column;
       width: 360px;
-      height: 500px;
+      height: 520px;
       background: #0f172a;
       border: 1px solid #1e293b;
       border-radius: 16px;
@@ -57,6 +57,73 @@
       color: #94a3b8;
       font-size: 18px;
       cursor: pointer;
+    }
+    
+    /* Lead Form Styling */
+    #cloudbot-lead-screen {
+      flex: 1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+      background: #0f172a;
+    }
+    .cb-lead-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f8fafc;
+      text-align: center;
+      margin: 0;
+    }
+    .cb-lead-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .cb-lead-input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .cb-lead-input:focus { border-color: #6366f1; }
+    .cb-lead-submit {
+      width: 100%;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 11px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
+    }
+    .cb-lead-submit:hover { background: #4338ca; }
+    .cb-lead-skip {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: underline;
+    }
+
+    /* Chat View Styling */
+    #cloudbot-chat-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
     }
     #cloudbot-messages {
       flex: 1;
@@ -129,14 +196,28 @@
         <span>CloudBot Support</span>
         <button id="cloudbot-close-btn">&times;</button>
       </div>
-      <div id="cloudbot-messages">
-        <div class="cb-msg cb-bot">Hello! How can I assist you today?</div>
+
+      <div id="cloudbot-lead-screen">
+        <h3 class="cb-lead-title">Welcome to Support! 👋</h3>
+        <p class="cb-lead-subtitle">Please share your contact details to start chatting.</p>
+        <input type="text" id="cb-lead-name" class="cb-lead-input" placeholder="Your Full Name *" required />
+        <input type="email" id="cb-lead-email" class="cb-lead-input" placeholder="Your Email Address *" required />
+        <input type="tel" id="cb-lead-phone" class="cb-lead-input" placeholder="Phone Number (optional)" />
+        <button id="cb-lead-btn" class="cb-lead-submit">Start Conversation</button>
+        <button id="cb-lead-skip" class="cb-lead-skip">Skip for now</button>
       </div>
-      <div id="cloudbot-input-container">
-        <input type="text" id="cloudbot-input" placeholder="Ask a question..." />
-        <button id="cloudbot-send-btn">Send</button>
+
+      <div id="cloudbot-chat-screen">
+        <div id="cloudbot-messages">
+          <div class="cb-msg cb-bot">Hello! How can I assist you today?</div>
+        </div>
+        <div id="cloudbot-input-container">
+          <input type="text" id="cloudbot-input" placeholder="Ask a question..." />
+          <button id="cloudbot-send-btn">Send</button>
+        </div>
       </div>
     </div>
+
     <button id="cloudbot-toggle-btn" aria-label="Open Chat">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -145,19 +226,84 @@
   `;
   document.body.appendChild(container);
 
+  // DOM Elements
   const toggleBtn = document.getElementById('cloudbot-toggle-btn');
   const closeBtn = document.getElementById('cloudbot-close-btn');
   const chatWindow = document.getElementById('cloudbot-chat-window');
+  const leadScreen = document.getElementById('cloudbot-lead-screen');
+  const chatScreen = document.getElementById('cloudbot-chat-screen');
+  const leadName = document.getElementById('cb-lead-name');
+  const leadEmail = document.getElementById('cb-lead-email');
+  const leadPhone = document.getElementById('cb-lead-phone');
+  const leadBtn = document.getElementById('cb-lead-btn');
+  const leadSkip = document.getElementById('cb-lead-skip');
   const messagesContainer = document.getElementById('cloudbot-messages');
   const input = document.getElementById('cloudbot-input');
   const sendBtn = document.getElementById('cloudbot-send-btn');
 
+  // Check if lead was already captured in this browser session
+  const isLeadCaptured = sessionStorage.getItem(`cb_lead_${botId}`);
+  if (isLeadCaptured) {
+    leadScreen.style.display = 'none';
+    chatScreen.style.display = 'flex';
+  }
+
   toggleBtn.onclick = () => {
     const isVisible = chatWindow.style.display === 'flex';
     chatWindow.style.display = isVisible ? 'none' : 'flex';
-    if (!isVisible) input.focus();
+    if (!isVisible) {
+      if (chatScreen.style.display === 'flex') {
+        input.focus();
+      } else {
+        leadName.focus();
+      }
+    }
   };
+
   closeBtn.onclick = () => { chatWindow.style.display = 'none'; };
+
+  function unlockChat() {
+    leadScreen.style.display = 'none';
+    chatScreen.style.display = 'flex';
+    sessionStorage.setItem(`cb_lead_${botId}`, 'true');
+    input.focus();
+  }
+
+  // Submit Lead Form
+  leadBtn.onclick = async () => {
+    const name = leadName.value.trim();
+    const email = leadEmail.value.trim();
+    const phone = leadPhone.value.trim();
+
+    if (!name || !email) {
+      alert("Please provide both Name and Email address.");
+      return;
+    }
+
+    leadBtn.disabled = true;
+    leadBtn.textContent = "Connecting...";
+
+    try {
+      await fetch(`${BACKEND_API_URL}/chat/lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bot_id: botId,
+          name: name,
+          email: email,
+          phone: phone || null
+        })
+      });
+    } catch (e) {
+      console.warn("Lead capture background error:", e);
+    }
+
+    unlockChat();
+  };
+
+  leadSkip.onclick = () => {
+    unlockChat();
+  };
 
   async function sendMessage() {
     const question = input.value.trim();
