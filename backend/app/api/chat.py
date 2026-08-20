@@ -1,8 +1,10 @@
 import uuid
 import json
+import os
 import asyncio
+import httpx
 from typing import List, Optional, Any, Dict
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,6 +15,13 @@ from app.schemas.chat_schema import ChatRequest
 from app.services.rag_service import generate_rag_response
 
 router = APIRouter(prefix="/chat", tags=["Chat & Inference"])
+
+# Environment variables for WhatsApp Integration
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "cloudbot_secret_2026")
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+DEFAULT_BOT_ID = os.getenv("DEFAULT_WHATSAPP_BOT_ID", "test_bot_1")
+
 
 # --- Schemas for Leads & Feedback ---
 class LeadCreate(BaseModel):
@@ -26,7 +35,109 @@ class FeedbackRequest(BaseModel):
     feedback: str  # 'up' or 'down'
 
 
+# ==========================================
+# 0. WhatsApp Webhook Endpoints (Meta Cloud API)
+# ==========================================
+
+@router.get("/whatsapp/webhook")
+async def verify_whatsapp_webhook(request: Request):
+    """
+    Meta Developer Portal verification handshake endpoint.
+    """
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        return Response(content=challenge, media_type="text/plain")
+    raise HTTPException(status_code=403, detail="Verification token mismatch")
+
+
+@router.post("/whatsapp/webhook")
+async def receive_whatsapp_message(request: Request, db: Session = Depends(get_db)):
+    """
+    Receives incoming WhatsApp messages, identifies the bot, runs RAG, and sends replies.
+    """
+    try:
+        data = await request.json()
+        entry = data.get("entry", [])
+        if not entry:
+            return {"status": "ignored"}
+
+        changes = entry[0].get("changes", [])
+        if not changes:
+            return {"status": "ignored"}
+
+        value = changes[0].get("value", {})
+        messages = value.get("messages", [])
+        incoming_phone_id = value.get("metadata", {}).get("phone_number_id")
+
+        if messages:
+            msg = messages[0]
+            from_number = msg.get("from")
+            user_text = msg.get("text", {}).get("body", "")
+
+            if user_text and from_number:
+                # 1. Determine which Bot/Agent to route to
+                target_bot_id = DEFAULT_BOT_ID
+
+                # 2. Run Grounded RAG Pipeline
+                rag_output = generate_rag_response(bot_id=target_bot_id, question=user_text)
+                if isinstance(rag_output, dict):
+                    bot_reply = rag_output.get("answer", "")
+                else:
+                    bot_reply = str(rag_output)
+
+                # 3. Save conversation history
+                try:
+                    user_msg = ChatMessage(
+                        id=f"msg_{uuid.uuid4().hex[:12]}",
+                        bot_id=target_bot_id,
+                        sender=f"whatsapp_{from_number}",
+                        message=user_text
+                    )
+                    bot_msg = ChatMessage(
+                        id=f"msg_{uuid.uuid4().hex[:12]}",
+                        bot_id=target_bot_id,
+                        sender="bot",
+                        message=bot_reply
+                    )
+                    db.add(user_msg)
+                    db.add(bot_msg)
+                    db.commit()
+                except Exception as log_err:
+                    db.rollback()
+                    print(f"WhatsApp DB Logging Error: {log_err}")
+
+                # 4. Reply back to WhatsApp user
+                active_token = WHATSAPP_TOKEN
+                active_phone_id = PHONE_NUMBER_ID or incoming_phone_id
+
+                if active_token and active_phone_id:
+                    whatsapp_api_url = f"https://graph.facebook.com/v20.0/{active_phone_id}/messages"
+                    headers = {
+                        "Authorization": f"Bearer {active_token}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "messaging_product": "whatsapp",
+                        "to": from_number,
+                        "type": "text",
+                        "text": {"body": bot_reply}
+                    }
+                    async with httpx.AsyncClient() as client:
+                        await client.post(whatsapp_api_url, json=payload, headers=headers)
+
+    except Exception as e:
+        print(f"WhatsApp webhook processing error: {e}")
+
+    return {"status": "success"}
+
+
+# ==========================================
 # 1. Lead Generation Endpoints
+# ==========================================
 @router.post("/lead")
 def capture_lead(lead_in: LeadCreate, db: Session = Depends(get_db)):
     """Captures and stores visitor contact details for a specific bot."""
@@ -64,7 +175,9 @@ def get_leads(bot_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch leads: {str(e)}")
 
 
+# ==========================================
 # 2. Message Feedback Endpoint
+# ==========================================
 @router.post("/feedback")
 def submit_feedback(data: FeedbackRequest, db: Session = Depends(get_db)):
     """Saves thumbs up/down rating for a bot reply."""
@@ -80,7 +193,9 @@ def submit_feedback(data: FeedbackRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
 
 
+# ==========================================
 # 3. Live Streaming Endpoint (SSE + Human Handoff Detection)
+# ==========================================
 @router.post("/stream")
 async def chat_stream_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
     """Streams word-by-word RAG tokens and detects need for human handoff."""
@@ -176,7 +291,9 @@ async def chat_stream_endpoint(request: ChatRequest, db: Session = Depends(get_d
         raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
 
 
-# 4. Standard Non-Streaming Chat Endpoint (Grounded RAG with Sources & Citations)
+# ==========================================
+# 4. Standard Non-Streaming Chat Endpoint
+# ==========================================
 @router.post("/")
 def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
     try:
@@ -265,7 +382,9 @@ def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
 
 
+# ==========================================
 # 5. History Retrieval
+# ==========================================
 @router.get("/history/{bot_id}")
 def get_chat_history(bot_id: str, db: Session = Depends(get_db)):
     """Fetches ordered conversation history for the Logs dashboard."""
