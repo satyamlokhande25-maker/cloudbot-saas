@@ -1,355 +1,266 @@
-# ⚡ CloudBot SaaS (FastBot AI)
+# CloudBot SaaS
 
-An AI-powered, multi-tenant conversational SaaS platform designed to build, customize, and deploy custom Knowledge-Base (RAG) AI Agents across multiple communication channels including WhatsApp, Discord, Telegram, and Embeddable Web Widgets.
+## Enterprise-Grade AI-Powered Conversational Intelligence Platform
 
----
-
-## 🌟 Key Features
-
-* **Multi-Tenant Architecture**: Dedicated data isolation per user/organization with secure authentication and database access control.
-* **Retrieval-Augmented Generation (RAG)**: Ingest documents, FAQs, and custom text to deliver precise, context-aware answers powered by Google Gemini and vector search.
-* **Multi-Channel Integrations**:
-  * **WhatsApp Cloud API**: Webhook-based messaging and automated query responses.
-  * **Discord Bot**: Server channel mentions and direct message interactions using `discord.py`.
-  * **Telegram Bot**: Instant connection via BotFather API tokens.
-  * **Embeddable Web Widget**: Lightweight drop-in `<script>` snippet for websites.
-* **Real-Time Session Logging**: Automated tracking of user chats, response metrics, and token usage.
+A comprehensive, production-ready SaaS solution designed for organizations to build, customize, and deploy intelligent Knowledge-Base (RAG) AI Agents seamlessly across multiple communication channels including WhatsApp, Discord, Telegram, and custom web integrations.
 
 ---
 
-## 🛠️ Tech Stack
+## Overview
 
-* **Backend**: Python 3.10+, FastAPI, Uvicorn
-* **Database & Auth**: Supabase (PostgreSQL), Row Level Security (RLS)
-* **AI & Embeddings**: Google Gemini API (`gemini-1.5-flash`), ChromaDB / Vector Store
-* **Integrations**: Meta WhatsApp Cloud API, Discord API (`discord.py`), Telegram Bot API
-* **Deployment**: Render (Backend), Vercel (Frontend/Dashboard)
+CloudBot SaaS provides organizations with a unified platform for deploying conversational AI agents that leverage proprietary knowledge bases and business logic. Built with enterprise-grade architecture principles, the platform ensures secure multi-tenant data isolation, scalable infrastructure, and seamless integration with existing communication channels and workflows.
+
+### Target Use Cases
+
+- **Customer Support Automation**: Deliver instant, contextually accurate responses to customer inquiries
+- **Internal Knowledge Access**: Enable employees to retrieve organizational knowledge through natural language
+- **Document Retrieval Systems**: Implement semantic search across large document repositories
+- **Multi-Channel Support**: Maintain consistent bot behavior across WhatsApp, Discord, Telegram, and web
 
 ---
 
-## 📁 Project Structure
+## Core Capabilities
 
-```text
+- **Secure Multi-Tenant Architecture**: Implements complete data isolation at the application and database levels with role-based access control (RBAC) and enterprise-grade authentication mechanisms ensuring full regulatory compliance and tenant data security.
+
+- **Advanced Retrieval-Augmented Generation (RAG)**: Enables organizations to ingest proprietary documents, knowledge bases, and FAQ repositories to deliver contextually accurate responses powered by Google Gemini API with vector-based semantic search capabilities.
+
+- **Unified Multi-Channel Communication Platform**:
+  - **WhatsApp Integration**: Enterprise-grade webhook-based messaging via Meta WhatsApp Cloud API with automated response handling and message queuing
+  - **Discord Workspace Integration**: Native Discord bot implementation with channel and direct message support using discord.py framework
+  - **Telegram Bot Support**: Rapid deployment via BotFather API with webhook configuration
+  - **Web Integration Widget**: Lightweight, self-contained chat widget for website integration with minimal dependencies
+
+- **Comprehensive Analytics & Monitoring**: Real-time tracking of conversation metrics, response latency analysis, and API token consumption reporting for cost optimization and performance monitoring.
+
+---
+
+## Technology Stack
+
+| Layer | Implementation |
+|-------|---|
+| **Backend Framework** | Python 3.10+, FastAPI, Uvicorn |
+| **Data Persistence & Identity** | Supabase (PostgreSQL), Row Level Security (RLS), JWT-based Authentication |
+| **Artificial Intelligence** | Google Gemini API (gemini-1.5-flash), ChromaDB Vector Store |
+| **External Integrations** | Meta WhatsApp Cloud API, Discord.py Framework, Telegram Bot API |
+| **Infrastructure & Deployment** | Render (Backend Runtime), Vercel (Frontend Hosting) |
+
+---
+
+## 📁 Project Architecture
+
+```
+cloudbot-saas/
 ├── backend/
 │   ├── app/
-│   │   ├── api/             # FastAPI route handlers & webhooks
-│   │   ├── core/            # Config, security, and environment loaders
-│   │   ├── models/          # Pydantic schemas & database models
-│   │   ├── services/        # RAG pipeline, Gemini LLM, and integration services
+│   │   ├── api/                 # FastAPI route handlers & webhooks
+│   │   ├── core/                # Configuration, security, and environment management
+│   │   ├── models/              # Pydantic schemas & database models
+│   │   ├── services/            # RAG pipeline, LLM integration, and channel services
 │   │   │   ├── discord_bot.py
 │   │   │   ├── whatsapp_service.py
 │   │   │   └── rag_service.py
-│   │   └── main.py          # FastAPI application entrypoint
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile
-├── frontend/                # SaaS dashboard & widgets
-└── README.md
-🚀 Getting Started
-1. Prerequisites
-Python 3.10 or higher
+│   │   └── main.py              # FastAPI application entrypoint
+│   ├── requirements.txt         # Python dependencies
+│   └── Dockerfile               # Container configuration
+├── frontend/                    # SaaS dashboard & widget components
+├── .env.example                 # Environment variables template
+└── README.md                    # Project documentation
+```
 
-Node.js & npm (if running frontend dashboard)
+---
 
-Supabase Account & Project
+## Deployment & Configuration
 
-Google Gemini API Key
+### System Requirements
 
-2. Clone the Repository
-Bash
-git clone [https://github.com/your-username/cloudbot-saas.git](https://github.com/your-username/cloudbot-saas.git)
+The following prerequisites must be satisfied prior to deployment:
+
+- **Python Runtime**: Version 3.10 or higher
+- **Frontend Dependencies**: Node.js 16+ and npm package manager (for dashboard)
+- **Database**: Active Supabase project with PostgreSQL database
+- **API Credentials**: Valid Google Gemini API key with appropriate quotas
+
+### Installation Procedure
+
+#### Step 1: Repository Setup
+
+```bash
+git clone https://github.com/your-username/cloudbot-saas.git
 cd cloudbot-saas
-3. Backend Setup
-Bash
+```
+
+#### Step 2: Backend Environment Configuration
+
+```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows users: venv\Scripts\activate
 pip install -r requirements.txt
-4. Environment Variables
-Create a .env file inside the backend directory:
+```
 
-Code snippet
-# Server
+#### Step 3: Environment Variables Configuration
+
+Create a `.env` configuration file in the `backend/` directory with the following parameters:
+
+```env
+# Application Configuration
 PORT=8000
 ENVIRONMENT=development
 
-# Database & Auth (Supabase)
-SUPABASE_URL=[https://your-supabase-project.supabase.co](https://your-supabase-project.supabase.co)
+# Supabase Database & Authentication
+SUPABASE_URL=https://your-supabase-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# LLM & AI
+# Google Gemini LLM Configuration
 GEMINI_API_KEY=your_google_gemini_api_key
 
-# WhatsApp Cloud API
+# WhatsApp Cloud API Credentials
 WHATSAPP_TOKEN=your_meta_system_or_test_token
 WHATSAPP_VERIFY_TOKEN=your_custom_webhook_secret_token
 PHONE_NUMBER_ID=your_whatsapp_phone_number_id
 
-# Discord Bot
+# Discord Bot Credentials
 DISCORD_BOT_TOKEN=your_discord_bot_token
-5. Run the Server
-Bash
+```
+
+#### Step 4: Server Initialization
+
+```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-🔌 Channel Setup Guides
-💬 WhatsApp Cloud API
-Navigate to the Meta Developers Portal and locate your WhatsApp App settings.
+```
 
-Set your Callback URL to:
-
-Plaintext
-[https://your-domain.com/chat/whatsapp/webhook/](https://your-domain.com/chat/whatsapp/webhook/)
-Enter your configured WHATSAPP_VERIFY_TOKEN.
-
-Subscribe to the messages webhook field.
-
-🤖 Discord Bot
-Create an application in the Discord Developer Portal.
-
-Under the Bot tab, enable all Privileged Gateway Intents (Message Content Intent, Presence Intent, Server Members Intent).
-
-Generate an OAuth2 invite link with the bot scope and message permissions (Send Messages, Read Messages/History).
-
-Add the generated DISCORD_BOT_TOKEN to your environment variables.
-
-🔒 Security & Database Policies
-Database tables (users, bots, documents, chat_sessions) are governed by Supabase Row Level Security (RLS).
-
-Multi-tenant queries are scoped by user_id / bot_id to ensure absolute tenant data isolation.
-
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.# ⚡ CloudBot SaaS (FastBot AI)
-
-An AI-powered, multi-tenant conversational SaaS platform designed to build, customize, and deploy custom Knowledge-Base (RAG) AI Agents across multiple communication channels including WhatsApp, Discord, Telegram, and Embeddable Web Widgets.
+The API server will be accessible at `http://localhost:8000`
 
 ---
 
-## 🌟 Key Features
+## Channel Integration Configuration
 
-* **Multi-Tenant Architecture**: Dedicated data isolation per user/organization with secure authentication and database access control.
-* **Retrieval-Augmented Generation (RAG)**: Ingest documents, FAQs, and custom text to deliver precise, context-aware answers powered by Google Gemini and vector search.
-* **Multi-Channel Integrations**:
-  * **WhatsApp Cloud API**: Webhook-based messaging and automated query responses.
-  * **Discord Bot**: Server channel mentions and direct message interactions using `discord.py`.
-  * **Telegram Bot**: Instant connection via BotFather API tokens.
-  * **Embeddable Web Widget**: Lightweight drop-in `<script>` snippet for websites.
-* **Real-Time Session Logging**: Automated tracking of user chats, response metrics, and token usage.
+### WhatsApp Cloud API Setup
 
----
+Follow these procedures to establish WhatsApp integration:
 
-## 🛠️ Tech Stack
+1. Access the **Meta Developers Console** and navigate to your WhatsApp application configuration
+2. Configure the webhook callback endpoint:
+   ```
+   https://your-domain.com/chat/whatsapp/webhook/
+   ```
+3. Register the `WHATSAPP_VERIFY_TOKEN` for webhook validation and security
+4. Subscribe to the `messages` webhook event type in the application manifest
+5. Execute webhook verification process and deploy to production environment
 
-* **Backend**: Python 3.10+, FastAPI, Uvicorn
-* **Database & Auth**: Supabase (PostgreSQL), Row Level Security (RLS)
-* **AI & Embeddings**: Google Gemini API (`gemini-1.5-flash`), ChromaDB / Vector Store
-* **Integrations**: Meta WhatsApp Cloud API, Discord API (`discord.py`), Telegram Bot API
-* **Deployment**: Render (Backend), Vercel (Frontend/Dashboard)
+### Discord Bot Configuration
 
----
+Complete the following steps to integrate Discord:
 
-## 📁 Project Structure
+1. Create a new application in the **Discord Developer Portal**
+2. Navigate to the **Bot** configuration panel and enable the following Privileged Gateway Intents:
+   - Message Content Intent
+   - Presence Intent
+   - Server Members Intent
+3. Generate an OAuth2 authorization link with the following specifications:
+   - OAuth Scope: `bot`
+   - Required Permissions: `Send Messages`, `Read Messages/History`
+4. Populate the `DISCORD_BOT_TOKEN` environment variable with the generated token
+5. Authorize the bot application to your Discord workspace using the OAuth link
 
-```text
-├── backend/
-│   ├── app/
-│   │   ├── api/             # FastAPI route handlers & webhooks
-│   │   ├── core/            # Config, security, and environment loaders
-│   │   ├── models/          # Pydantic schemas & database models
-│   │   ├── services/        # RAG pipeline, Gemini LLM, and integration services
-│   │   │   ├── discord_bot.py
-│   │   │   ├── whatsapp_service.py
-│   │   │   └── rag_service.py
-│   │   └── main.py          # FastAPI application entrypoint
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile
-├── frontend/                # SaaS dashboard & widgets
-└── README.md
-🚀 Getting Started
-1. Prerequisites
-Python 3.10 or higher
+### Telegram Bot Deployment
 
-Node.js & npm (if running frontend dashboard)
+To configure Telegram bot integration:
 
-Supabase Account & Project
-
-Google Gemini API Key
-
-2. Clone the Repository
-Bash
-git clone [https://github.com/your-username/cloudbot-saas.git](https://github.com/your-username/cloudbot-saas.git)
-cd cloudbot-saas
-3. Backend Setup
-Bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-4. Environment Variables
-Create a .env file inside the backend directory:
-
-Code snippet
-# Server
-PORT=8000
-ENVIRONMENT=development
-
-# Database & Auth (Supabase)
-SUPABASE_URL=[https://your-supabase-project.supabase.co](https://your-supabase-project.supabase.co)
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-# LLM & AI
-GEMINI_API_KEY=your_google_gemini_api_key
-
-# WhatsApp Cloud API
-WHATSAPP_TOKEN=your_meta_system_or_test_token
-WHATSAPP_VERIFY_TOKEN=your_custom_webhook_secret_token
-PHONE_NUMBER_ID=your_whatsapp_phone_number_id
-
-# Discord Bot
-DISCORD_BOT_TOKEN=your_discord_bot_token
-5. Run the Server
-Bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-🔌 Channel Setup Guides
-💬 WhatsApp Cloud API
-Navigate to the Meta Developers Portal and locate your WhatsApp App settings.
-
-Set your Callback URL to:
-
-Plaintext
-[https://your-domain.com/chat/whatsapp/webhook/](https://your-domain.com/chat/whatsapp/webhook/)
-Enter your configured WHATSAPP_VERIFY_TOKEN.
-
-Subscribe to the messages webhook field.
-
-🤖 Discord Bot
-Create an application in the Discord Developer Portal.
-
-Under the Bot tab, enable all Privileged Gateway Intents (Message Content Intent, Presence Intent, Server Members Intent).
-
-Generate an OAuth2 invite link with the bot scope and message permissions (Send Messages, Read Messages/History).
-
-Add the generated DISCORD_BOT_TOKEN to your environment variables.
-
-🔒 Security & Database Policies
-Database tables (users, bots, documents, chat_sessions) are governed by Supabase Row Level Security (RLS).
-
-Multi-tenant queries are scoped by user_id / bot_id to ensure absolute tenant data isolation.
-
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.# ⚡ CloudBot SaaS (FastBot AI)
-
-An AI-powered, multi-tenant conversational SaaS platform designed to build, customize, and deploy custom Knowledge-Base (RAG) AI Agents across multiple communication channels including WhatsApp, Discord, Telegram, and Embeddable Web Widgets.
+1. Initialize a new bot by contacting **@BotFather** on Telegram
+2. Record the issued bot token and add it to the `TELEGRAM_BOT_TOKEN` environment variable
+3. Configure webhook endpoint for message reception
+4. Deploy bot to production and activate polling or webhook mode
 
 ---
 
-## 🌟 Key Features
+## Security Architecture & Compliance
 
-* **Multi-Tenant Architecture**: Dedicated data isolation per user/organization with secure authentication and database access control.
-* **Retrieval-Augmented Generation (RAG)**: Ingest documents, FAQs, and custom text to deliver precise, context-aware answers powered by Google Gemini and vector search.
-* **Multi-Channel Integrations**:
-  * **WhatsApp Cloud API**: Webhook-based messaging and automated query responses.
-  * **Discord Bot**: Server channel mentions and direct message interactions using `discord.py`.
-  * **Telegram Bot**: Instant connection via BotFather API tokens.
-  * **Embeddable Web Widget**: Lightweight drop-in `<script>` snippet for websites.
-* **Real-Time Session Logging**: Automated tracking of user chats, response metrics, and token usage.
+### Data Protection Framework
+
+The platform implements comprehensive security controls at multiple layers:
+
+- **Row Level Security (RLS)**: All database tables (`users`, `bots`, `documents`, `chat_sessions`) enforce Supabase RLS policies at the table level
+- **Multi-Tenant Isolation**: Query scoping mechanisms based on `user_id` and `bot_id` attributes ensure complete logical isolation between tenants
+- **Service Account Management**: Privileged operations utilize service role authentication with comprehensive audit logging and access tracking
+- **Credential Management**: All sensitive credentials are managed exclusively through environment variables with no hardcoded values
+
+### Security Best Practices & Operational Guidelines
+
+Organizations deploying this platform should adhere to the following security protocols:
+
+- **Credential Rotation**: Implement scheduled rotation of API tokens and authentication credentials (minimum quarterly)
+- **Environment Isolation**: Maintain separate `.env` configurations for development, staging, and production environments
+- **Transport Security**: Enforce HTTPS/TLS 1.2+ for all webhook endpoints and API communications
+- **Rate Limiting**: Implement API rate limiting on public endpoints to prevent abuse and ensure platform stability
+- **Audit Logging**: Enable comprehensive logging and monitoring of all API access patterns and administrative actions
+- **Access Control**: Implement principle of least privilege for all service account permissions
 
 ---
 
-## 🛠️ Tech Stack
+## API Documentation & Developer Resources
 
-* **Backend**: Python 3.10+, FastAPI, Uvicorn
-* **Database & Auth**: Supabase (PostgreSQL), Row Level Security (RLS)
-* **AI & Embeddings**: Google Gemini API (`gemini-1.5-flash`), ChromaDB / Vector Store
-* **Integrations**: Meta WhatsApp Cloud API, Discord API (`discord.py`), Telegram Bot API
-* **Deployment**: Render (Backend), Vercel (Frontend/Dashboard)
+Interactive API documentation is available once the development server is running:
+
+- **OpenAPI/Swagger Interface**: `http://localhost:8000/docs`
+- **ReDoc Documentation**: `http://localhost:8000/redoc`
+
+These resources provide comprehensive endpoint documentation, request/response schemas, and interactive testing capabilities.
 
 ---
 
-## 📁 Project Structure
+## Production Deployment
 
-```text
-├── backend/
-│   ├── app/
-│   │   ├── api/             # FastAPI route handlers & webhooks
-│   │   ├── core/            # Config, security, and environment loaders
-│   │   ├── models/          # Pydantic schemas & database models
-│   │   ├── services/        # RAG pipeline, Gemini LLM, and integration services
-│   │   │   ├── discord_bot.py
-│   │   │   ├── whatsapp_service.py
-│   │   │   └── rag_service.py
-│   │   └── main.py          # FastAPI application entrypoint
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile
-├── frontend/                # SaaS dashboard & widgets
-└── README.md
-🚀 Getting Started
-1. Prerequisites
-Python 3.10 or higher
+### Backend Infrastructure (Render)
 
-Node.js & npm (if running frontend dashboard)
+Deploy the backend service using Render's container platform:
 
-Supabase Account & Project
+1. Connect your Git repository to Render
+2. Create a new Web Service
+3. Configure build process: `pip install -r requirements.txt`
+4. Set startup command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Populate all required environment variables in the Render dashboard
+6. Initialize deployment and monitor runtime logs
 
-Google Gemini API Key
+### Frontend Distribution (Vercel)
 
-2. Clone the Repository
-Bash
-git clone [https://github.com/your-username/cloudbot-saas.git](https://github.com/your-username/cloudbot-saas.git)
-cd cloudbot-saas
-3. Backend Setup
-Bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-4. Environment Variables
-Create a .env file inside the backend directory:
+Deploy the SaaS dashboard using Vercel's edge network:
 
-Code snippet
-# Server
-PORT=8000
-ENVIRONMENT=development
+1. Connect your Git repository to Vercel
+2. Configure build settings for your frontend framework (React, Next.js, Vue, etc.)
+3. Register API endpoint environment variables
+4. Enable automatic deployments on repository push
 
-# Database & Auth (Supabase)
-SUPABASE_URL=[https://your-supabase-project.supabase.co](https://your-supabase-project.supabase.co)
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+---
 
-# LLM & AI
-GEMINI_API_KEY=your_google_gemini_api_key
+## Licensing
 
-# WhatsApp Cloud API
-WHATSAPP_TOKEN=your_meta_system_or_test_token
-WHATSAPP_VERIFY_TOKEN=your_custom_webhook_secret_token
-PHONE_NUMBER_ID=your_whatsapp_phone_number_id
+This software is distributed under the MIT License. Refer to the [LICENSE](LICENSE) file for complete license terms and conditions.
 
-# Discord Bot
-DISCORD_BOT_TOKEN=your_discord_bot_token
-5. Run the Server
-Bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-🔌 Channel Setup Guides
-💬 WhatsApp Cloud API
-Navigate to the Meta Developers Portal and locate your WhatsApp App settings.
+---
 
-Set your Callback URL to:
+## Support & Contributions
 
-Plaintext
-[https://your-domain.com/chat/whatsapp/webhook/](https://your-domain.com/chat/whatsapp/webhook/)
-Enter your configured WHATSAPP_VERIFY_TOKEN.
+### Reporting Issues
 
-Subscribe to the messages webhook field.
+For bug reports, feature requests, or technical issues:
 
-🤖 Discord Bot
-Create an application in the Discord Developer Portal.
+- Create an issue in the GitHub repository with detailed reproduction steps
+- Include relevant configuration and error logs
+- Specify affected versions and deployment environment
 
-Under the Bot tab, enable all Privileged Gateway Intents (Message Content Intent, Presence Intent, Server Members Intent).
+### Contributing
 
-Generate an OAuth2 invite link with the bot scope and message permissions (Send Messages, Read Messages/History).
+We welcome contributions from the community. Please:
 
-Add the generated DISCORD_BOT_TOKEN to your environment variables.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/improvement`)
+3. Commit changes with descriptive messages
+4. Submit a pull request with comprehensive documentation
 
-🔒 Security & Database Policies
-Database tables (users, bots, documents, chat_sessions) are governed by Supabase Row Level Security (RLS).
+---
 
-Multi-tenant queries are scoped by user_id / bot_id to ensure absolute tenant data isolation.
-
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Documentation Version**: 2.0  
+**Last Updated**: August 2026  
+**Status**: Production Ready
