@@ -3,6 +3,8 @@
 ## Enterprise-Grade AI-Powered Conversational Intelligence Platform
 
 A comprehensive, production-ready SaaS solution designed for organizations to build, customize, and deploy intelligent Knowledge-Base (RAG) AI Agents seamlessly across multiple communication channels including WhatsApp, Discord, Telegram, and custom web integrations.
+my first commit.
+
 
 ---
 
